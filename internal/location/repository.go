@@ -2,6 +2,7 @@ package location
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sort"
 	"strconv"
@@ -129,7 +130,28 @@ func NewAirtableRepository(repo Repository, airtableClient *airtable.Client, air
 
 // List returns all locations from the underlying repository.
 func (r *AirtableRepository) List() []Location {
-	return r.repo.List()
+	records, err := r.airtableClient.ListRecords(context.Background(), r.airtableTable, nil)
+	if err != nil {
+		log.Printf("Failed to list locations from Airtable: %v", err)
+		return r.repo.List()
+	}
+
+	locations := make([]Location, 0, len(records))
+	for _, record := range records {
+		loc, err := mapAirtableRecord(record)
+		if err != nil {
+			log.Printf("Skipping Airtable record due to mapping error: %v", err)
+			continue
+		}
+		locations = append(locations, loc)
+	}
+
+	// If Airtable returns no records, fall back to underlying repository
+	if len(locations) == 0 {
+		return r.repo.List()
+	}
+
+	return locations
 }
 
 // Get retrieves a location by ID from the underlying repository.
@@ -170,4 +192,18 @@ func (r *AirtableRepository) Update(id string, location Location) (Location, boo
 // Delete removes a location from the underlying repository.
 func (r *AirtableRepository) Delete(id string) bool {
 	return r.repo.Delete(id)
+}
+
+func mapAirtableRecord(record airtable.Record) (Location, error) {
+	status, err := getStatusFromFields(record.Fields)
+	if err != nil {
+		return Location{}, fmt.Errorf("invalid status for record %s: %w", record.ID, err)
+	}
+
+	return Location{
+		ID:     record.ID,
+		Name:   getStringField(record.Fields, FieldName),
+		Slug:   getStringField(record.Fields, FieldSlug),
+		Status: status,
+	}, nil
 }

@@ -1,6 +1,7 @@
 package location
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -52,9 +53,13 @@ func (h *Handler) CreateLocation(c *gin.Context) {
 
 	// Generate slug from name if not provided
 	locationSlug := payload.Slug
-	if locationSlug == "" {
+	if locationSlug != "" {
+		locationSlug = slug.Make(locationSlug)
+	} else {
 		locationSlug = slug.Make(payload.Name)
 	}
+
+	locationSlug = ensureUniqueSlug(h.repo, locationSlug)
 
 	// Validate status if provided, default to active
 	status := StatusActive
@@ -138,4 +143,26 @@ type locationPayload struct {
 	Name   string `json:"name" binding:"required"` // Required
 	Slug   string `json:"slug"`                    // Optional, will be generated from name if not provided
 	Status string `json:"status"`                  // Optional, defaults to "Active"
+}
+
+func ensureUniqueSlug(repo Repository, baseSlug string) string {
+	if baseSlug == "" {
+		baseSlug = "location"
+	}
+
+	existingSlugs := make(map[string]struct{})
+	for _, loc := range repo.List() {
+		existingSlugs[loc.Slug] = struct{}{}
+	}
+
+	if _, exists := existingSlugs[baseSlug]; !exists {
+		return baseSlug
+	}
+
+	for i := 1; ; i++ {
+		candidate := fmt.Sprintf("%s-%d", baseSlug, i)
+		if _, exists := existingSlugs[candidate]; !exists {
+			return candidate
+		}
+	}
 }
