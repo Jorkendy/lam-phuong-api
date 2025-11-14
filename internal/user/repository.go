@@ -247,8 +247,40 @@ func (r *AirtableRepository) Get(id string) (User, bool) {
 	return user, true
 }
 
-// GetByEmail retrieves a user by email from the underlying repository
+// GetByEmail retrieves a user by email, preferring Airtable and falling back to repo cache
 func (r *AirtableRepository) GetByEmail(email string) (User, bool) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return User{}, false
+	}
+
+	filter := fmt.Sprintf(
+		"LOWER({%s}) = '%s'",
+		FieldEmail,
+		escapeAirtableFormulaValue(strings.ToLower(email)),
+	)
+
+	records, err := r.airtableClient.ListRecords(
+		context.Background(),
+		r.airtableTable,
+		&airtable.ListParams{
+			PageSize:        1,
+			FilterByFormula: filter,
+		},
+	)
+	if err != nil {
+		log.Printf("Failed to find user by email in Airtable: %v", err)
+		return r.repo.GetByEmail(email)
+	}
+
+	if len(records) > 0 {
+		user, mapErr := mapAirtableRecord(records[0])
+		if mapErr == nil {
+			return user, true
+		}
+		log.Printf("Failed to map Airtable user for email %s: %v", email, mapErr)
+	}
+
 	return r.repo.GetByEmail(email)
 }
 
