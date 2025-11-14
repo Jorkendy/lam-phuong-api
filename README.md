@@ -75,6 +75,12 @@ The project uses **`.env` files** for configuration (recommended for development
 
 ### Authentication
 
+- **POST** `/api/auth/register` - User registration (public)
+  - Body: `{ "email": "string" (required, valid email), "password": "string" (required, min 6 characters) }`
+  - Returns: `{ "access_token": "jwt_token", "token_type": "Bearer", "expires_in": 86400, "user": {...} }`
+  - Creates a new user with "User" role and automatically logs them in
+  - Returns 409 Conflict if email already exists
+
 - **POST** `/api/auth/login` - User login
   - Body: `{ "email": "string" (required), "password": "string" (required) }`
   - Returns: `{ "access_token": "jwt_token", "token_type": "Bearer", "expires_in": 86400, "user": {...} }`
@@ -84,14 +90,15 @@ The project uses **`.env` files** for configuration (recommended for development
 Authorization: Bearer <your_jwt_token>
 ```
 
-### Users (Protected - Requires Authentication)
+### Users (Protected - Requires Admin Role)
 
-- **GET** `/api/users` - List all users
-- **POST** `/api/users` - Create a new user
-  - Body: `{ "email": "string" (required, valid email), "password": "string" (required, min 6 characters) }`
+- **GET** `/api/users` - List all users (Admin only)
+- **POST** `/api/users` - Create a new user (Admin only)
+  - Body: `{ "email": "string" (required, valid email), "password": "string" (required, min 6 characters), "role": "string" (optional, defaults to "User") }`
+  - Valid roles: `"Super Admin"`, `"Admin"`, `"User"`
   - Password is automatically hashed using bcrypt
   - Returns 409 Conflict if email already exists
-- **DELETE** `/api/users/:id` - Delete a user by ID
+- **DELETE** `/api/users/:id` - Delete a user by ID (Admin only)
 
 ### Locations (Protected - Requires Authentication)
 
@@ -107,6 +114,20 @@ Authorization: Bearer <your_jwt_token>
 - **GET** `/api/ping` - Health check endpoint
 
 For detailed API documentation with request/response schemas, visit the [Swagger UI](#4-access-swagger-documentation).
+
+## Authorization
+
+The API uses role-based access control (RBAC) with three roles:
+- **Super Admin** - Highest level of access
+- **Admin** - Administrative access (required for user management)
+- **User** - Standard user access (default role)
+
+**See [Authorization Guide](docs/AUTHORIZATION.md) for detailed information on:**
+- How to use authorization middleware
+- Examples of protecting routes
+- Accessing user information in handlers
+- Testing authorization
+- Best practices
 
 ## Project Structure
 

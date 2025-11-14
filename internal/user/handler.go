@@ -25,18 +25,82 @@ func NewHandler(repo Repository, jwtSecret string, tokenExpiry time.Duration) *H
 }
 
 // RegisterRoutes attaches user routes to the supplied router group
+// Only registers public auth routes. Protected routes should be registered separately in router.go
 func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
-	// Public routes
+	// Public routes only
+	router.POST("/auth/register", h.RegisterHandler)
 	router.POST("/auth/login", h.LoginHandler)
+}
 
-	// Protected routes
-	protected := router.Group("")
-	protected.Use(AuthMiddleware(h.jwtSecret))
-	{
-		protected.GET("/users", h.ListUsers)
-		protected.POST("/users", h.CreateUser)
-		protected.DELETE("/users/:id", h.DeleteUser)
+// Register godoc
+// @Summary      User registration
+// @Description  Register a new user account with email and password. Returns JWT token for immediate use.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        credentials  body      RegisterRequest  true  "Registration credentials"
+// @Success      201         {object}  TokenResponse
+// @Failure      400         {object}  map[string]string
+// @Failure      409         {object}  map[string]string
+// @Failure      500         {object}  map[string]string
+// @Router       /auth/register [post]
+func (h *Handler) RegisterHandler(c *gin.Context) {
+	var req RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
+
+	// Check if user already exists
+	_, exists := h.repo.GetByEmail(req.Email)
+	if exists {
+		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+		return
+	}
+
+	// Hash the password
+	hashedPassword, err := HashPassword(req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Create user with default "User" role
+	user := User{
+		Email:    req.Email,
+		Password: hashedPassword,
+		Role:     RoleUser, // Always "User" role for public registration
+	}
+
+	// Create in repository (repository handles Airtable sync if configured)
+	created, err := h.repo.Create(c.Request.Context(), user)
+	if err != nil {
+		// Check if it's a duplicate email error (race condition)
+		if strings.Contains(err.Error(), "already exists") {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Generate JWT token for immediate use (auto-login)
+	token, err := GenerateToken(created, h.jwtSecret, h.tokenExpiry)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	// Remove password from user object
+	created.Password = ""
+
+	// Return token response
+	c.JSON(http.StatusCreated, TokenResponse{
+		AccessToken: token,
+		TokenType:   "Bearer",
+		ExpiresIn:   int64(h.tokenExpiry.Seconds()),
+		User:        created,
+	})
 }
 
 // Login godoc
@@ -171,6 +235,12 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{})
+}
+
+// RegisterRequest represents the registration request payload
+type RegisterRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
 }
 
 type createUserPayload struct {
