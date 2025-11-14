@@ -3,7 +3,7 @@ name: Deploy to VPS
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:  # Cho phép trigger thủ công
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -12,43 +12,64 @@ jobs:
     steps:
     - name: 📥 Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # ✅ Lấy full history để có commit hash
     
     - name: 🔧 Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
     
-    # ✅ THÊM BƯỚC NÀY
+    # ✅ QUAN TRỌNG: Clear cache cũ
+    - name: 🧹 Clean Go cache
+      run: |
+        go clean -cache -modcache -testcache
+        rm -rf ~/go/pkg/mod
+    
     - name: 📦 Download dependencies
       run: |
-       go mod download
-       go mod verify
+        go mod download
+        go mod verify
     
-    - name: 📦 Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+    # ✅ Lấy version info
+    - name: 📝 Get version info
+      id: version
+      run: |
+        echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        echo "BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+        echo "VERSION=$(git describe --tags --always --dirty)" >> $GITHUB_ENV
     
     - name: 🔍 Run tests
       run: go test -v ./...
     
+    # ✅ Build với version info và force rebuild
     - name: 🏗️ Build binary
       run: |
-        GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o myapp ./cmd/server
+        GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+          -a \
+          -ldflags="-s -w -X main.Version=${{ env.VERSION }} -X main.CommitHash=${{ env.COMMIT_HASH }} -X main.BuildTime=${{ env.BUILD_TIME }}" \
+          -o myapp ./cmd/server
+        
+        # Verify binary được build
+        ls -lh myapp
+        file myapp
+        
+        # Tạo checksum
+        sha256sum myapp > myapp.sha256
+        cat myapp.sha256
     
-    - name: 📤 Upload binary to VPS
+    # ✅ Upload cả binary và checksum
+    - name: 📤 Upload to VPS
       uses: appleboy/scp-action@v0.1.7
       with:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
-        source: "myapp"
+        source: "myapp,myapp.sha256"
         target: "/tmp/"
         overwrite: true
     
+    # ✅ Deploy với verify
     - name: 🚀 Deploy on VPS
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -56,13 +77,15 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
         script: |
-           sudo /opt/scripts/deploy-myapp.sh
+          sudo /opt/scripts/deploy-myapp.sh ${{ env.VERSION }} ${{ env.COMMIT_HASH }}
     
     - name: 📊 Deployment status
       if: always()
       run: |
         if [ ${{ job.status }} == 'success' ]; then
           echo "✅ Deployment successful!"
+          echo "Version: ${{ env.VERSION }}"
+          echo "Commit: ${{ env.COMMIT_HASH }}"
         else
           echo "❌ Deployment failed!"
         fi
