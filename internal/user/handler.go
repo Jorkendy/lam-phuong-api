@@ -10,16 +10,16 @@ import (
 
 // Handler exposes HTTP handlers for the user resource
 type Handler struct {
-	repo       Repository
-	jwtSecret  string
+	repo        Repository
+	jwtSecret   string
 	tokenExpiry time.Duration
 }
 
 // NewHandler creates a handler with the provided repository
 func NewHandler(repo Repository, jwtSecret string, tokenExpiry time.Duration) *Handler {
 	return &Handler{
-		repo:       repo,
-		jwtSecret:  jwtSecret,
+		repo:        repo,
+		jwtSecret:   jwtSecret,
 		tokenExpiry: tokenExpiry,
 	}
 }
@@ -28,13 +28,14 @@ func NewHandler(repo Repository, jwtSecret string, tokenExpiry time.Duration) *H
 func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	// Public routes
 	router.POST("/auth/login", h.LoginHandler)
+	router.POST("/users", h.CreateUser)
 
 	// Protected routes
 	protected := router.Group("")
 	protected.Use(AuthMiddleware(h.jwtSecret))
 	{
 		protected.GET("/users", h.ListUsers)
-		protected.POST("/users", h.CreateUser)
+		// protected.POST("/users", h.CreateUser)
 		protected.DELETE("/users/:id", h.DeleteUser)
 	}
 }
@@ -154,4 +155,3 @@ type createUserPayload struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 }
-
