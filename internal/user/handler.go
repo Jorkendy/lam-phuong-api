@@ -237,6 +237,94 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
+// UpdateUser godoc
+// @Summary      Update user role and password
+// @Description  Update a user's role and/or password by ID (requires super admin role)
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      string              true  "User ID"
+// @Param        user  body      updateUserPayload  true  "Update payload (role and/or password)"
+// @Success      200   {object}  User
+// @Failure      400   {object}  map[string]string
+// @Failure      401   {object}  map[string]string
+// @Failure      403   {object}  map[string]string
+// @Failure      404   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /users/{id} [put]
+func (h *Handler) UpdateUser(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+		return
+	}
+
+	var payload updateUserPayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get existing user
+	existingUser, exists := h.repo.Get(id)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	// Prepare update
+	updatedUser := existingUser
+
+	// Update password if provided
+	if payload.Password != "" {
+		if len(payload.Password) < 6 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 6 characters"})
+			return
+		}
+		hashedPassword, err := HashPassword(payload.Password)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+			return
+		}
+		updatedUser.Password = hashedPassword
+	}
+
+	// Update role if provided
+	if payload.Role != "" {
+		// Validate role
+		validRole := false
+		for _, valid := range ValidRoles {
+			if payload.Role == valid {
+				validRole = true
+				break
+			}
+		}
+		if !validRole {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Valid roles: " + joinRoles(ValidRoles)})
+			return
+		}
+		updatedUser.Role = payload.Role
+	}
+
+	// Check if at least one field is being updated
+	if payload.Password == "" && payload.Role == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one field (password or role) must be provided"})
+		return
+	}
+
+	// Update in repository (repository handles Airtable sync if configured)
+	updated, err := h.repo.Update(c.Request.Context(), id, updatedUser)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Remove password from response
+	updated.Password = ""
+	c.JSON(http.StatusOK, updated)
+}
+
 // RegisterRequest represents the registration request payload
 type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
@@ -247,4 +335,9 @@ type createUserPayload struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 	Role     string `json:"role"`
+}
+
+type updateUserPayload struct {
+	Password string `json:"password"` // Optional, min 6 characters if provided
+	Role     string `json:"role"`     // Optional, must be valid role if provided
 }

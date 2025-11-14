@@ -4,10 +4,10 @@ import "fmt"
 
 // Airtable field names
 const (
-	FieldName     = "Name"
-	FieldSlug     = "Slug"
-	FieldCreatedAt = "CreatedAt"
-	FieldUpdatedAt = "UpdatedAt"
+	FieldName      = "Name"
+	FieldSlug      = "Slug"
+	FieldCreatedAt = "Created At"
+	FieldUpdatedAt = "Updated At"
 )
 
 // Helper functions
@@ -22,9 +22,9 @@ func getStringField(fields map[string]interface{}, key string) string {
 
 // Location represents a physical place served by the API.
 type Location struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Slug   string `json:"slug"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
 }
 
 // ToAirtableFields converts a Location to Airtable fields format (for creation)
@@ -51,8 +51,8 @@ func FromAirtable(record map[string]interface{}) (*Location, error) {
 	}
 
 	return &Location{
-		ID:     id,
-		Name:   getStringField(fields, FieldName),
-		Slug:   getStringField(fields, FieldSlug),
+		ID:   id,
+		Name: getStringField(fields, FieldName),
+		Slug: getStringField(fields, FieldSlug),
 	}, nil
 }

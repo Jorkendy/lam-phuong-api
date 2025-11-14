@@ -13,8 +13,8 @@ const (
 	FieldEmail     = "Email"
 	FieldPassword  = "Password"
 	FieldRole      = "Role"
-	FieldCreatedAt = "CreatedAt"
-	FieldUpdatedAt = "UpdatedAt"
+	FieldCreatedAt = "Created At"
+	FieldUpdatedAt = "Updated At"
 )
 
 // User roles

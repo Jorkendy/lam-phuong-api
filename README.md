@@ -98,6 +98,11 @@ Authorization: Bearer <your_jwt_token>
   - Valid roles: `"Super Admin"`, `"Admin"`, `"User"`
   - Password is automatically hashed using bcrypt
   - Returns 409 Conflict if email already exists
+- **PUT** `/api/users/:id` - Update user role and/or password (Super Admin only)
+  - Body: `{ "password": "string" (optional, min 6 characters if provided), "role": "string" (optional, must be valid role if provided) }`
+  - At least one field (password or role) must be provided
+  - Valid roles: `"Super Admin"`, `"Admin"`, `"User"`
+  - Password is automatically hashed using bcrypt
 - **DELETE** `/api/users/:id` - Delete a user by ID (Admin only)
 
 ### Locations (Protected - Requires Authentication)

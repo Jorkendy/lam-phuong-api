@@ -50,6 +50,13 @@ func NewRouter(locationHandler *location.Handler, userHandler *user.Handler, jwt
 				adminRoutes.DELETE("/users/:id", userHandler.DeleteUser)
 			}
 
+			// User update routes (super admin only)
+			superAdminRoutes := protected.Group("")
+			superAdminRoutes.Use(user.RequireRole(user.RoleSuperAdmin))
+			{
+				superAdminRoutes.PUT("/users/:id", userHandler.UpdateUser)
+			}
+
 			// Location routes (authenticated users)
 			locationHandler.RegisterRoutes(protected)
 		}
