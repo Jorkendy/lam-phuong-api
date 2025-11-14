@@ -147,7 +147,7 @@ func (r *AirtableRepository) Create(ctx context.Context, location Location) (Loc
 	}
 
 	// Save to Airtable
-	airtableFields := created.ToAirtableFields()
+	airtableFields := created.ToAirtableFieldsForCreate()
 	log.Printf("Attempting to save location to Airtable table: %s", r.airtableTable)
 	airtableRecord, err := r.airtableClient.CreateRecord(ctx, r.airtableTable, airtableFields)
 	if err != nil {

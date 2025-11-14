@@ -15,6 +15,7 @@ import (
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Airtable AirtableConfig `mapstructure:"airtable"`
+	Auth     AuthConfig     `mapstructure:"auth"`
 }
 
 // ServerConfig holds server-related configuration
@@ -30,6 +31,13 @@ type AirtableConfig struct {
 	APIKey             string `mapstructure:"api_key"`
 	BaseID             string `mapstructure:"base_id"`
 	LocationsTableName string `mapstructure:"locations_table_name"`
+	UsersTableName     string `mapstructure:"users_table_name"`
+}
+
+// AuthConfig holds authentication-related configuration
+type AuthConfig struct {
+	JWTSecret   string `mapstructure:"jwt_secret"`
+	TokenExpiry int    `mapstructure:"token_expiry"` // in hours
 }
 
 var (
@@ -87,6 +95,11 @@ func setDefaults() {
 	viper.SetDefault("airtable.api_key", "")
 	viper.SetDefault("airtable.base_id", "")
 	viper.SetDefault("airtable.locations_table_name", "Địa điểm")
+	viper.SetDefault("airtable.users_table_name", "Người dùng")
+
+	// Auth defaults
+	viper.SetDefault("auth.jwt_secret", "")
+	viper.SetDefault("auth.token_expiry", 24) // 24 hours
 }
 
 // Validate checks if required configuration values are set
@@ -106,6 +119,20 @@ func (c *Config) Validate() error {
 	// LocationsTableName has a default value, so it's optional but we ensure it's set
 	if c.Airtable.LocationsTableName == "" {
 		c.Airtable.LocationsTableName = "Địa điểm" // Fallback to default if somehow empty
+	}
+
+	// UsersTableName has a default value, so it's optional but we ensure it's set
+	if c.Airtable.UsersTableName == "" {
+		c.Airtable.UsersTableName = "Người dùng" // Fallback to default if somehow empty
+	}
+
+	// Validate auth config
+	if c.Auth.JWTSecret == "" {
+		return fmt.Errorf("JWT secret is required (set AUTH_JWT_SECRET)")
+	}
+
+	if c.Auth.TokenExpiry <= 0 {
+		c.Auth.TokenExpiry = 24 // Default to 24 hours
 	}
 
 	return nil

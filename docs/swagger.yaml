@@ -20,6 +20,60 @@ definitions:
     required:
     - name
     type: object
+  user.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  user.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  user.TokenResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/user.User'
+    type: object
+  user.User:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      role:
+        type: string
+    type: object
+  user.createUserPayload:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+      role:
+        type: string
+    required:
+    - email
+    - password
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -34,11 +88,86 @@ info:
   title: Lam Phuong API
   version: "1.0"
 paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password, returns JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/user.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.TokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: User login
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account with email and password. Returns JWT
+        token for immediate use.
+      parameters:
+      - description: Registration credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/user.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/user.TokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: User registration
+      tags:
+      - auth
   /locations:
     get:
       consumes:
       - application/json
-      description: Get a list of all locations
+      description: Get a list of all locations (requires authentication)
       produces:
       - application/json
       responses:
@@ -48,6 +177,14 @@ paths:
             items:
               $ref: '#/definitions/location.Location'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
       summary: List all locations
       tags:
       - locations
@@ -55,7 +192,7 @@ paths:
       consumes:
       - application/json
       description: Create a new location with name and optional slug. If slug is not
-        provided, it will be generated from the name.
+        provided, it will be generated from the name. (requires authentication)
       parameters:
       - description: Location payload
         in: body
@@ -76,12 +213,20 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
           description: Internal Server Error
           schema:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Create a new location
       tags:
       - locations
@@ -89,7 +234,7 @@ paths:
     delete:
       consumes:
       - application/json
-      description: Delete a location using its slug
+      description: Delete a location using its slug (requires authentication)
       parameters:
       - description: Location slug
         in: path
@@ -110,16 +255,157 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "404":
           description: Not Found
           schema:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Delete a location by slug
       tags:
       - locations
+  /users:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all users (requires admin role)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/user.User'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Create a new user with email, password, and optional role (requires
+        admin role)
+      parameters:
+      - description: User payload
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/user.createUserPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/user.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new user
+      tags:
+      - users
+  /users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a user using its ID (requires admin role)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a user by ID
+      tags:
+      - users
 schemes:
 - http
 - https
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

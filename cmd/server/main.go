@@ -2,11 +2,13 @@ package main
 
 import (
 	"log"
+	"time"
 
 	_ "lam-phuong-api/docs" // Import docs for Swagger
 	"lam-phuong-api/internal/config"
 	"lam-phuong-api/internal/location"
 	"lam-phuong-api/internal/server"
+	"lam-phuong-api/internal/user"
 )
 
 // @title           Lam Phuong API
@@ -25,6 +27,11 @@ import (
 // @BasePath  /api
 
 // @schemes   http https
+
+// @securityDefinitions.apikey  BearerAuth
+// @in                          header
+// @name                        Authorization
+// @description                 Type "Bearer" followed by a space and JWT token.
 func main() {
 	// Load configuration
 	cfg, err := config.Load()
@@ -55,7 +62,20 @@ func main() {
 
 	locationHandler := location.NewHandler(locationRepo)
 
-	router := server.NewRouter(locationHandler)
+	// Initialize user seed data
+	userSeed := []user.User{}
+
+	// Create in-memory user repository
+	baseUserRepo := user.NewInMemoryRepository(userSeed)
+
+	// Wrap with Airtable repository for persistence
+	userRepo := user.NewAirtableRepository(baseUserRepo, airtableClient, cfg.Airtable.UsersTableName)
+
+	// Create user handler with JWT configuration
+	tokenExpiry := time.Duration(cfg.Auth.TokenExpiry) * time.Hour
+	userHandler := user.NewHandler(userRepo, cfg.Auth.JWTSecret, tokenExpiry)
+
+	router := server.NewRouter(locationHandler, userHandler, cfg.Auth.JWTSecret)
 
 	// Use server address from config
 	serverAddr := cfg.ServerAddress()
