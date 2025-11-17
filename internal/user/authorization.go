@@ -1,8 +1,9 @@
 package user
 
 import (
-	"github.com/gin-gonic/gin"
 	"lam-phuong-api/internal/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 // RequireRole creates a middleware that requires the user to have one of the specified roles
@@ -42,9 +43,9 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 	}
 }
 
-// RequireAdmin is a convenience middleware that requires admin role
+// RequireAdmin is a convenience middleware that requires admin role or higher (Super Admin)
 func RequireAdmin() gin.HandlerFunc {
-	return RequireRole(RoleAdmin)
+	return RequireRole(RoleAdmin, RoleSuperAdmin)
 }
 
 // RequireAnyRole is a convenience middleware that requires user or admin role
@@ -63,4 +64,3 @@ func joinRoles(roles []string) string {
 	}
 	return result
 }
-
