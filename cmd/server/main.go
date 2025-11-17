@@ -7,17 +7,11 @@ import (
 	"time"
 
 	docs "lam-phuong-api/docs" // Import docs for Swagger
+	buildinfo "lam-phuong-api/internal"
 	"lam-phuong-api/internal/config"
 	"lam-phuong-api/internal/location"
 	"lam-phuong-api/internal/server"
 	"lam-phuong-api/internal/user"
-)
-
-// ✅ THÊM PHẦN NÀY - Version info được inject khi build
-var (
-	Version    = "dev"
-	CommitHash = "unknown"
-	BuildTime  = "unknown"
 )
 
 // @title           Lam Phuong API
@@ -45,9 +39,9 @@ func main() {
 	// ✅ THÊM LOG VERSION KHI KHỞI ĐỘNG
 	log.Printf("========================================")
 	log.Printf("🚀 Lam Phuong API")
-	log.Printf("📦 Version: %s", Version)
-	log.Printf("🔖 Commit: %s", CommitHash)
-	log.Printf("🕒 Build Time: %s", BuildTime)
+	log.Printf("  Version: %s", buildinfo.Version)
+	log.Printf("  Commit: %s", buildinfo.Commit)
+	log.Printf("  Build Time: %s", buildinfo.BuildTime)
 	log.Printf("========================================")
 
 	// Load configuration
@@ -118,7 +112,9 @@ func main() {
 	userHandler := user.NewHandler(userRepo, cfg.Auth.JWTSecret, tokenExpiry)
 
 	// ✅ THÊM VERSION INFO VÀO ROUTER
-	router := server.NewRouter(locationHandler, userHandler, cfg.Auth.JWTSecret, Version, CommitHash, BuildTime)
+	router := server.NewRouter(locationHandler, userHandler, cfg.Auth.JWTSecret, buildinfo.Version,
+		buildinfo.Commit,
+		buildinfo.BuildTime)
 
 	// Use server address from config
 	serverAddr := cfg.ServerAddress()
