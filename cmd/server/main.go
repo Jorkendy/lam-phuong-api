@@ -102,7 +102,6 @@ func main() {
 	tokenExpiry := time.Duration(cfg.Auth.TokenExpiry) * time.Hour
 	userHandler := user.NewHandler(userRepo, cfg.Auth.JWTSecret, tokenExpiry)
 
-	// ✅ THÊM VERSION INFO VÀO ROUTER
 	router := server.NewRouter(locationHandler, userHandler, cfg.Auth.JWTSecret)
 
 	// Use server address from config
