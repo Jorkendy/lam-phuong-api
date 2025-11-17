@@ -20,6 +20,7 @@ type Repository interface {
 	Update(ctx context.Context, id string, user User) (User, error)
 	Delete(id string) bool
 	GetByEmail(email string) (User, bool)
+	GetByVerificationToken(token string) (User, bool)
 }
 
 // InMemoryRepository stores users in memory and is safe for concurrent access
@@ -111,6 +112,20 @@ func (r *InMemoryRepository) GetByEmail(email string) (User, bool) {
 
 	for _, user := range r.data {
 		if user.Email == email {
+			return user, true
+		}
+	}
+
+	return User{}, false
+}
+
+// GetByVerificationToken retrieves a user by email verification token
+func (r *InMemoryRepository) GetByVerificationToken(token string) (User, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, user := range r.data {
+		if user.EmailVerificationToken == token {
 			return user, true
 		}
 	}
@@ -284,6 +299,43 @@ func (r *AirtableRepository) GetByEmail(email string) (User, bool) {
 	return r.repo.GetByEmail(email)
 }
 
+// GetByVerificationToken retrieves a user by verification token, preferring Airtable and falling back to repo cache
+func (r *AirtableRepository) GetByVerificationToken(token string) (User, bool) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return User{}, false
+	}
+
+	filter := fmt.Sprintf(
+		"{%s} = '%s'",
+		FieldEmailVerificationToken,
+		escapeAirtableFormulaValue(token),
+	)
+
+	records, err := r.airtableClient.ListRecords(
+		context.Background(),
+		r.airtableTable,
+		&airtable.ListParams{
+			PageSize:        1,
+			FilterByFormula: filter,
+		},
+	)
+	if err != nil {
+		log.Printf("Failed to find user by verification token in Airtable: %v", err)
+		return r.repo.GetByVerificationToken(token)
+	}
+
+	if len(records) > 0 {
+		user, mapErr := mapAirtableRecord(records[0])
+		if mapErr == nil {
+			return user, true
+		}
+		log.Printf("Failed to map Airtable user for token: %v", mapErr)
+	}
+
+	return r.repo.GetByVerificationToken(token)
+}
+
 // Update updates an existing user in the repository and syncs it to Airtable
 func (r *AirtableRepository) Update(ctx context.Context, id string, updatedUser User) (User, error) {
 	// Get existing user to preserve email
@@ -325,11 +377,17 @@ func mapAirtableRecord(record airtable.Record) (User, error) {
 	if role == "" {
 		role = RoleUser // Default role
 	}
+	status := getStringField(record.Fields, FieldStatus)
+	if status == "" {
+		status = StatusPending // Default to pending
+	}
 	return User{
-		ID:       record.ID,
-		Email:    getStringField(record.Fields, FieldEmail),
-		Password: getStringField(record.Fields, FieldPassword),
-		Role:     role,
+		ID:                    record.ID,
+		Email:                 getStringField(record.Fields, FieldEmail),
+		Password:              getStringField(record.Fields, FieldPassword),
+		Role:                  role,
+		Status:                status,
+		EmailVerificationToken: getStringField(record.Fields, FieldEmailVerificationToken),
 	}, nil
 }
 

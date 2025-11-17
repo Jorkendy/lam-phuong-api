@@ -8,6 +8,7 @@ import (
 
 	docs "lam-phuong-api/docs" // Import docs for Swagger
 	"lam-phuong-api/internal/config"
+	"lam-phuong-api/internal/email"
 	"lam-phuong-api/internal/location"
 	"lam-phuong-api/internal/server"
 	"lam-phuong-api/internal/user"
@@ -98,9 +99,19 @@ func main() {
 	// Wrap with Airtable repository for persistence
 	userRepo := user.NewAirtableRepository(baseUserRepo, airtableClient, cfg.Airtable.UsersTableName)
 
-	// Create user handler with JWT configuration
+	// Initialize email service
+	emailService := email.NewService(
+		cfg.Email.SMTPHost,
+		cfg.Email.SMTPPort,
+		cfg.Email.SMTPUsername,
+		cfg.Email.SMTPPassword,
+		cfg.Email.FromEmail,
+		cfg.Email.FromName,
+	)
+
+	// Create user handler with JWT configuration and email service
 	tokenExpiry := time.Duration(cfg.Auth.TokenExpiry) * time.Hour
-	userHandler := user.NewHandler(userRepo, cfg.Auth.JWTSecret, tokenExpiry)
+	userHandler := user.NewHandler(userRepo, cfg.Auth.JWTSecret, tokenExpiry, emailService, cfg.Email.BaseURL)
 
 	router := server.NewRouter(locationHandler, userHandler, cfg.Auth.JWTSecret)
 
