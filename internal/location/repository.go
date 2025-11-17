@@ -4,10 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sort"
-	"strconv"
 	"strings"
-	"sync"
 
 	"lam-phuong-api/internal/airtable"
 )
@@ -19,105 +16,26 @@ type Repository interface {
 	DeleteBySlug(slug string) bool
 }
 
-// InMemoryRepository stores locations in memory and is safe for concurrent access.
-type InMemoryRepository struct {
-	mu     sync.RWMutex
-	data   map[string]Location
-	nextID int
-}
-
-// NewInMemoryRepository creates an in-memory repository seeded with optional data.
-func NewInMemoryRepository(seed []Location) *InMemoryRepository {
-	repo := &InMemoryRepository{
-		data:   make(map[string]Location),
-		nextID: 1,
-	}
-
-	maxID := 0
-	for _, l := range seed {
-		repo.data[l.ID] = l
-		if id, err := strconv.Atoi(l.ID); err == nil && id > maxID {
-			maxID = id
-		}
-	}
-	repo.nextID = maxID + 1
-
-	return repo
-}
-
-// List returns all locations sorted by ID.
-func (r *InMemoryRepository) List() []Location {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	locations := make([]Location, 0, len(r.data))
-	for _, location := range r.data {
-		locations = append(locations, location)
-	}
-
-	sort.Slice(locations, func(i, j int) bool {
-		return locations[i].ID < locations[j].ID
-	})
-
-	return locations
-}
-
-// Create adds a new location and automatically assigns an ID.
-// Note: ctx parameter is for interface compatibility but not used in in-memory implementation.
-func (r *InMemoryRepository) Create(ctx context.Context, location Location) (Location, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	location.ID = strconv.Itoa(r.nextID)
-	r.nextID++
-	r.data[location.ID] = location
-
-	return location, nil
-}
-
-// DeleteBySlug removes a location by its slug.
-func (r *InMemoryRepository) DeleteBySlug(slug string) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	var targetID string
-	for id, loc := range r.data {
-		if loc.Slug == slug {
-			targetID = id
-			break
-		}
-	}
-
-	if targetID == "" {
-		return false
-	}
-
-	delete(r.data, targetID)
-	return true
-}
-
-// AirtableRepository wraps a Repository and adds Airtable persistence.
+// AirtableRepository implements Repository interface using Airtable as the data store
 type AirtableRepository struct {
-	repo           Repository
 	airtableClient *airtable.Client
 	airtableTable  string
 }
 
-// NewAirtableRepository creates a repository that syncs to Airtable.
-func NewAirtableRepository(repo Repository, airtableClient *airtable.Client, airtableTable string) *AirtableRepository {
+// NewAirtableRepository creates a repository that uses Airtable as the data store
+func NewAirtableRepository(airtableClient *airtable.Client, airtableTable string) *AirtableRepository {
 	return &AirtableRepository{
-		repo:           repo,
 		airtableClient: airtableClient,
 		airtableTable:  airtableTable,
 	}
 }
 
-// List returns all locations from the underlying repository.
+// List returns all locations from Airtable
 func (r *AirtableRepository) List() []Location {
 	records, err := r.airtableClient.ListRecords(context.Background(), r.airtableTable, nil)
 	if err != nil {
 		log.Printf("Failed to list locations from Airtable: %v", err)
-		return r.repo.List()
+		return []Location{} // Return empty slice on error
 	}
 
 	locations := make([]Location, 0, len(records))
@@ -130,45 +48,29 @@ func (r *AirtableRepository) List() []Location {
 		locations = append(locations, loc)
 	}
 
-	// If Airtable returns no records, fall back to underlying repository
-	if len(locations) == 0 {
-		return r.repo.List()
-	}
-
 	return locations
 }
 
-// Create adds a new location to the repository and syncs it to Airtable.
+// Create adds a new location to Airtable
 func (r *AirtableRepository) Create(ctx context.Context, location Location) (Location, error) {
-	// Create in the underlying repository first
-	created, err := r.repo.Create(ctx, location)
-	if err != nil {
-		return Location{}, err
-	}
-
 	// Save to Airtable
-	airtableFields := created.ToAirtableFieldsForCreate()
+	airtableFields := location.ToAirtableFieldsForCreate()
 	log.Printf("Attempting to save location to Airtable table: %s", r.airtableTable)
 	airtableRecord, err := r.airtableClient.CreateRecord(ctx, r.airtableTable, airtableFields)
 	if err != nil {
-		// Log error but don't fail - location is already created in repo
 		log.Printf("Failed to save location to Airtable: %v", err)
 		log.Printf("Error details - Table: %s, Fields: %+v", r.airtableTable, airtableFields)
-		return created, nil // Return created location even if Airtable save failed
+		return Location{}, fmt.Errorf("failed to create location in Airtable: %w", err)
 	}
 
 	// Update the created location with Airtable ID
-	created.ID = airtableRecord.ID
+	location.ID = airtableRecord.ID
 	log.Printf("Location saved to Airtable successfully with ID: %s", airtableRecord.ID)
-	return created, nil
+	return location, nil
 }
 
-// DeleteBySlug removes a location by its slug.
+// DeleteBySlug removes a location by its slug from Airtable
 func (r *AirtableRepository) DeleteBySlug(slug string) bool {
-	// Delete from underlying repository
-	deleted := r.repo.DeleteBySlug(slug)
-
-	// Attempt to delete from Airtable
 	filterValue := escapeAirtableFormulaValue(slug)
 	params := &airtable.ListParams{
 		FilterByFormula: fmt.Sprintf("{%s} = '%s'", FieldSlug, filterValue),
@@ -177,11 +79,11 @@ func (r *AirtableRepository) DeleteBySlug(slug string) bool {
 	records, err := r.airtableClient.ListRecords(context.Background(), r.airtableTable, params)
 	if err != nil {
 		log.Printf("Failed to query Airtable for slug %s: %v", slug, err)
-		return deleted
+		return false
 	}
 
 	if len(records) == 0 {
-		return deleted
+		return false
 	}
 
 	ids := make([]string, 0, len(records))
@@ -191,9 +93,10 @@ func (r *AirtableRepository) DeleteBySlug(slug string) bool {
 
 	if err := r.airtableClient.BulkDeleteRecords(context.Background(), r.airtableTable, ids); err != nil {
 		log.Printf("Failed to delete Airtable records for slug %s: %v", slug, err)
+		return false
 	}
 
-	return deleted || len(ids) > 0
+	return true
 }
 
 func mapAirtableRecord(record airtable.Record) (Location, error) {

@@ -8,7 +8,6 @@ import (
 
 	docs "lam-phuong-api/docs" // Import docs for Swagger
 	"lam-phuong-api/internal/config"
-	"lam-phuong-api/internal/email"
 	"lam-phuong-api/internal/location"
 	"lam-phuong-api/internal/server"
 	"lam-phuong-api/internal/user"
@@ -72,47 +71,21 @@ func main() {
 		}
 	}
 
-	// Initialize seed data
-	locationSeed := []location.Location{
-		{ID: "1", Name: "Main Library", Slug: "main-library"},
-		{ID: "2", Name: "West Branch", Slug: "west-branch"},
-	}
-
-	// Create in-memory repository
-	baseRepo := location.NewInMemoryRepository(locationSeed)
-
-	// Wrap with Airtable repository for persistence
+	// Create Airtable client
 	airtableClient, err := cfg.NewAirtableClient()
 	if err != nil {
 		log.Fatalf("Failed to create Airtable client: %v", err)
 	}
-	locationRepo := location.NewAirtableRepository(baseRepo, airtableClient, cfg.Airtable.LocationsTableName)
 
+	// Create Airtable repositories directly
+	locationRepo := location.NewAirtableRepository(airtableClient, cfg.Airtable.LocationsTableName)
 	locationHandler := location.NewHandler(locationRepo)
 
-	// Initialize user seed data
-	userSeed := []user.User{}
+	userRepo := user.NewAirtableRepository(airtableClient, cfg.Airtable.UsersTableName)
 
-	// Create in-memory user repository
-	baseUserRepo := user.NewInMemoryRepository(userSeed)
-
-	// Wrap with Airtable repository for persistence
-	userRepo := user.NewAirtableRepository(baseUserRepo, airtableClient, cfg.Airtable.UsersTableName)
-
-	// Initialize email service with TLS configuration
-	emailService := email.NewServiceWithTLS(
-		cfg.Email.SMTPHost,
-		cfg.Email.SMTPPort,
-		cfg.Email.SMTPUsername,
-		cfg.Email.SMTPPassword,
-		cfg.Email.FromEmail,
-		cfg.Email.FromName,
-		cfg.Email.UseTLS,
-	)
-
-	// Create user handler with JWT configuration and email service
+	// Create user handler with JWT configuration
 	tokenExpiry := time.Duration(cfg.Auth.TokenExpiry) * time.Hour
-	userHandler := user.NewHandler(userRepo, cfg.Auth.JWTSecret, tokenExpiry, emailService, cfg.Email.BaseURL)
+	userHandler := user.NewHandler(userRepo, cfg.Auth.JWTSecret, tokenExpiry)
 
 	router := server.NewRouter(locationHandler, userHandler, cfg.Auth.JWTSecret)
 

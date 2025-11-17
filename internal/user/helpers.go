@@ -17,10 +17,7 @@ func (u *User) ToAirtableFieldsForCreate() map[string]interface{} {
 	if u.Status != "" {
 		fields[FieldStatus] = u.Status
 	} else {
-		fields[FieldStatus] = StatusPending // Default to pending
-	}
-	if u.EmailVerificationToken != "" {
-		fields[FieldEmailVerificationToken] = u.EmailVerificationToken
+		fields[FieldStatus] = StatusActive // Default to active
 	}
 	return fields
 }
@@ -40,9 +37,6 @@ func (u *User) ToAirtableFieldsForUpdate() map[string]interface{} {
 	}
 	if u.Status != "" {
 		fields[FieldStatus] = u.Status
-	}
-	if u.EmailVerificationToken != "" {
-		fields[FieldEmailVerificationToken] = u.EmailVerificationToken
 	}
 	return fields
 }
