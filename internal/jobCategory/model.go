@@ -6,15 +6,8 @@ import "fmt"
 const (
 	FieldName      = "Name"
 	FieldSlug      = "Slug"
-	FieldStatus    = "Status"
 	FieldCreatedAt = "Created At"
 	FieldUpdatedAt = "Updated At"
-)
-
-// Status constants
-const (
-	StatusActive   = "Active"
-	StatusDisabled = "Disabled"
 )
 
 // Helper functions
@@ -29,10 +22,9 @@ func getStringField(fields map[string]interface{}, key string) string {
 
 // JobCategory represents a job category.
 type JobCategory struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Slug   string `json:"slug"`
-	Status string `json:"status"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
 }
 
 // JobCategoryResponseWrapper wraps JobCategory in the standard API response format for Swagger
@@ -74,16 +66,10 @@ func FromAirtable(record map[string]interface{}) (*JobCategory, error) {
 		return nil, fmt.Errorf("invalid record: missing or invalid 'fields'")
 	}
 
-	status := getStringField(fields, FieldStatus)
-	if status == "" {
-		status = StatusActive // Default to Active if not set
-	}
-
 	return &JobCategory{
-		ID:     id,
-		Name:   getStringField(fields, FieldName),
-		Slug:   getStringField(fields, FieldSlug),
-		Status: status,
+		ID:   id,
+		Name: getStringField(fields, FieldName),
+		Slug: getStringField(fields, FieldSlug),
 	}, nil
 }
 

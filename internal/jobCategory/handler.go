@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gosimple/slug"
 	"lam-phuong-api/internal/response"
-	"lam-phuong-api/internal/user"
 )
 
 // Handler exposes HTTP handlers for the job category resource.
@@ -27,7 +26,6 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/job-categories", h.ListJobCategories)
 	router.POST("/job-categories", h.CreateJobCategory)
 	router.DELETE("/job-categories/:slug", h.DeleteJobCategoryBySlug)
-	router.POST("/job-categories/:slug/toggle-status", h.ToggleJobCategoryStatus)
 }
 
 // ListJobCategories godoc
@@ -151,71 +149,5 @@ func (h *Handler) DeleteJobCategoryBySlug(c *gin.Context) {
 	}
 
 	response.SuccessNoContent(c, "Job category deleted successfully")
-}
-
-// ToggleJobCategoryStatus godoc
-// @Summary      Toggle job category status
-// @Description  Toggle a job category's status between Active and Disabled. Only Admin or Super Admin can call this endpoint.
-// @Tags         job-categories
-// @Accept       json
-// @Produce      json
-// @Security     BearerAuth
-// @Param        slug  path      string  true  "Job category slug"
-// @Success      200   {object}  jobcategory.JobCategoryResponseWrapper  "Job category status toggled successfully"
-// @Failure      400   {object}  response.ErrorResponse  "Validation error"
-// @Failure      401   {object}  response.ErrorResponse  "Unauthorized"
-// @Failure      403   {object}  response.ErrorResponse  "Forbidden - Admin or Super Admin role required"
-// @Failure      404   {object}  response.ErrorResponse  "Job category not found"
-// @Failure      500   {object}  response.ErrorResponse  "Internal server error"
-// @Router       /job-categories/{slug}/toggle-status [post]
-func (h *Handler) ToggleJobCategoryStatus(c *gin.Context) {
-	// Check if user has admin role
-	userRole, exists := c.Get("user_role")
-	if !exists {
-		response.Unauthorized(c, "User role not found")
-		return
-	}
-	role := userRole.(string)
-	if role != user.RoleAdmin && role != user.RoleSuperAdmin {
-		response.Forbidden(c, "Admin or Super Admin role required")
-		return
-	}
-
-	slugParam := c.Param("slug")
-	if slugParam == "" {
-		response.BadRequest(c, "Job category slug is required", nil)
-		return
-	}
-
-	normalizedSlug := slug.Make(slugParam)
-	if normalizedSlug == "" {
-		response.ValidationError(c, "Invalid slug format", nil)
-		return
-	}
-
-	// Get existing job category by slug
-	existingJobCategory, exists := h.repo.GetBySlug(normalizedSlug)
-	if !exists {
-		response.NotFound(c, "Job category")
-		return
-	}
-
-	// Toggle status between Active and Disabled
-	var newStatus string
-	if existingJobCategory.Status == StatusActive {
-		newStatus = StatusDisabled
-	} else {
-		newStatus = StatusActive
-	}
-
-	// Update job category status
-	existingJobCategory.Status = newStatus
-	updated, err := h.repo.Update(c.Request.Context(), existingJobCategory.ID, existingJobCategory)
-	if err != nil {
-		response.InternalError(c, "Failed to update job category status: "+err.Error())
-		return
-	}
-
-	response.Success(c, http.StatusOK, updated, "Job category status toggled successfully")
 }
 

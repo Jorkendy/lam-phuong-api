@@ -165,15 +165,10 @@ func (r *AirtableRepository) Update(ctx context.Context, id string, jobCategory 
 }
 
 func mapAirtableRecord(record airtable.Record) (JobCategory, error) {
-	status := getStringField(record.Fields, FieldStatus)
-	if status == "" {
-		status = StatusActive // Default to Active if not set
-	}
 	return JobCategory{
-		ID:     record.ID,
-		Name:   getStringField(record.Fields, FieldName),
-		Slug:   getStringField(record.Fields, FieldSlug),
-		Status: status,
+		ID:   record.ID,
+		Name: getStringField(record.Fields, FieldName),
+		Slug: getStringField(record.Fields, FieldSlug),
 	}, nil
 }
 
