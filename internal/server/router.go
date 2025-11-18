@@ -8,13 +8,14 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
+	"lam-phuong-api/internal/email"
 	"lam-phuong-api/internal/location"
 	"lam-phuong-api/internal/response"
 	"lam-phuong-api/internal/user"
 )
 
 // NewRouter constructs a Gin engine configured with middleware and routes.
-func NewRouter(locationHandler *location.Handler, userHandler *user.Handler, jwtSecret string) *gin.Engine {
+func NewRouter(locationHandler *location.Handler, userHandler *user.Handler, emailHandler *email.Handler, jwtSecret string) *gin.Engine {
 	router := gin.Default()
 
 	// Configure CORS middleware
@@ -39,6 +40,11 @@ func NewRouter(locationHandler *location.Handler, userHandler *user.Handler, jwt
 	{
 		// Auth routes (public)
 		userHandler.RegisterRoutes(api)
+
+		// Email test route (public)
+		if emailHandler != nil {
+			api.POST("/email/test", emailHandler.SendTestEmail)
+		}
 
 		// Protected routes (require authentication)
 		protected := api.Group("")

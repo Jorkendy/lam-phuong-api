@@ -16,6 +16,7 @@ type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Airtable AirtableConfig `mapstructure:"airtable"`
 	Auth     AuthConfig     `mapstructure:"auth"`
+	Email    EmailConfig    `mapstructure:"email"`
 }
 
 // ServerConfig holds server-related configuration
@@ -38,6 +39,14 @@ type AirtableConfig struct {
 type AuthConfig struct {
 	JWTSecret   string `mapstructure:"jwt_secret"`
 	TokenExpiry int    `mapstructure:"token_expiry"` // in hours
+}
+
+// EmailConfig holds email-related configuration for Gmail API
+type EmailConfig struct {
+	CredentialsPath string `mapstructure:"credentials_path"` // Path to credentials.json file
+	TokenPath       string `mapstructure:"token_path"`       // Path to token.json file (will be created automatically)
+	FromEmail       string `mapstructure:"from_email"`       // Sender email address
+	FromName        string `mapstructure:"from_name"`        // Sender name
 }
 
 var (
@@ -100,6 +109,12 @@ func setDefaults() {
 	// Auth defaults
 	viper.SetDefault("auth.jwt_secret", "")
 	viper.SetDefault("auth.token_expiry", 24) // 24 hours
+
+	// Email defaults (Gmail API)
+	viper.SetDefault("email.credentials_path", "credentials.json")
+	viper.SetDefault("email.token_path", "token.json")
+	viper.SetDefault("email.from_email", "")
+	viper.SetDefault("email.from_name", "Lam Phuong")
 }
 
 // Validate checks if required configuration values are set

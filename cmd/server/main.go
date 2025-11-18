@@ -8,6 +8,7 @@ import (
 
 	docs "lam-phuong-api/docs" // Import docs for Swagger
 	"lam-phuong-api/internal/config"
+	"lam-phuong-api/internal/email"
 	"lam-phuong-api/internal/location"
 	"lam-phuong-api/internal/server"
 	"lam-phuong-api/internal/user"
@@ -87,7 +88,24 @@ func main() {
 	tokenExpiry := time.Duration(cfg.Auth.TokenExpiry) * time.Hour
 	userHandler := user.NewHandler(userRepo, cfg.Auth.JWTSecret, tokenExpiry)
 
-	router := server.NewRouter(locationHandler, userHandler, cfg.Auth.JWTSecret)
+	// Initialize email service (Gmail API)
+	var emailHandler *email.Handler
+	if cfg.Email.CredentialsPath != "" {
+		emailService, err := email.NewService(
+			cfg.Email.CredentialsPath,
+			cfg.Email.TokenPath,
+			cfg.Email.FromEmail,
+			cfg.Email.FromName,
+		)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize email service: %v", err)
+			log.Printf("Email functionality will be disabled. Make sure credentials.json is available.")
+		} else {
+			emailHandler = email.NewHandler(emailService)
+		}
+	}
+
+	router := server.NewRouter(locationHandler, userHandler, emailHandler, cfg.Auth.JWTSecret)
 
 	// Use server address from config
 	serverAddr := cfg.ServerAddress()
