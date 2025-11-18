@@ -153,8 +153,6 @@ definitions:
         type: string
       slug:
         type: string
-      status:
-        type: string
     type: object
   productgroup.ProductGroupResponseWrapper:
     description: Response containing a single product group
@@ -914,50 +912,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Delete a product group by slug
-      tags:
-      - product-groups
-  /product-groups/{slug}/toggle-status:
-    post:
-      consumes:
-      - application/json
-      description: Toggle a product group's status between Active and Disabled. Only
-        Admin or Super Admin can call this endpoint.
-      parameters:
-      - description: Product group slug
-        in: path
-        name: slug
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Product group status toggled successfully
-          schema:
-            $ref: '#/definitions/productgroup.ProductGroupResponseWrapper'
-        "400":
-          description: Validation error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "403":
-          description: Forbidden - Admin or Super Admin role required
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "404":
-          description: Product group not found
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Toggle product group status
       tags:
       - product-groups
   /users:

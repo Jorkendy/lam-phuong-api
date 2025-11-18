@@ -165,19 +165,13 @@ func (r *AirtableRepository) Update(ctx context.Context, id string, productGroup
 }
 
 func mapAirtableRecord(record airtable.Record) (ProductGroup, error) {
-	status := getStringField(record.Fields, FieldStatus)
-	if status == "" {
-		status = StatusActive // Default to Active if not set
-	}
 	return ProductGroup{
-		ID:     record.ID,
-		Name:   getStringField(record.Fields, FieldName),
-		Slug:   getStringField(record.Fields, FieldSlug),
-		Status: status,
+		ID:   record.ID,
+		Name: getStringField(record.Fields, FieldName),
+		Slug: getStringField(record.Fields, FieldSlug),
 	}, nil
 }
 
 func escapeAirtableFormulaValue(value string) string {
 	return strings.ReplaceAll(value, "'", "''")
 }
-
