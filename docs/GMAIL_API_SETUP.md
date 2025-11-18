@@ -51,42 +51,47 @@ This guide explains how to set up the Gmail API for sending emails, following th
 
 **Note:** The application uses a local HTTP server to receive the OAuth callback. When you authorize, Google will redirect to one of the configured localhost ports, and the application will automatically capture the authorization code. The server will automatically shut down after receiving the code.
 
-### 4. Configure Environment Variables
+### 4. Get Refresh Token
+
+To get a refresh token, you need to complete the OAuth flow once. You can use a tool or script to do this:
+
+1. Use the OAuth 2.0 Playground: https://developers.google.com/oauthplayground/
+   - Click the gear icon (⚙️) in the top right
+   - Check "Use your own OAuth credentials"
+   - Enter your Client ID and Client Secret
+   - In the left panel, find "Gmail API v1" and select `https://www.googleapis.com/auth/gmail.send`
+   - Click "Authorize APIs"
+   - Sign in and grant permissions
+   - Click "Exchange authorization code for tokens"
+   - Copy the "Refresh token" value
+
+2. Or use a simple script to generate the refresh token (see below)
+
+### 5. Configure Environment Variables
 
 Add the following to your `.env` file or set as environment variables:
 
 ```env
-EMAIL_CREDENTIALS_PATH=credentials.json
-EMAIL_TOKEN_PATH=token.json
+EMAIL_CLIENT_ID=your-client-id.apps.googleusercontent.com
+EMAIL_CLIENT_SECRET=your-client-secret
+EMAIL_REFRESH_TOKEN=your-refresh-token
 EMAIL_FROM_EMAIL=your-email@gmail.com
 EMAIL_FROM_NAME=Lam Phuong
 ```
 
 **Note:** 
-- `credentials.json` should be the path to your downloaded OAuth credentials file
-- `token.json` will be created automatically after the first OAuth authorization
+- `EMAIL_CLIENT_ID` and `EMAIL_CLIENT_SECRET` come from your OAuth 2.0 credentials in Google Cloud Console
+- `EMAIL_REFRESH_TOKEN` is obtained from the OAuth flow (see step 4)
 - `EMAIL_FROM_EMAIL` should be the Gmail address you want to send emails from
-
-### 5. First-Time Authorization
-
-When you first run the application:
-
-1. The application will print an authorization URL to the console
-2. Open the URL in your browser
-3. Sign in with the Google account you want to use for sending emails
-4. Grant the necessary permissions
-5. Copy the authorization code from the browser
-6. Paste it into the console when prompted
-7. The application will save the token to `token.json` for future use
-
-**Important:** After the first authorization, `token.json` will be created and reused automatically. You won't need to authorize again unless you revoke access or delete the token file.
+- The refresh token doesn't expire (unless revoked), so you only need to get it once
 
 ## Configuration
 
 The email service uses the following configuration options:
 
-- `EMAIL_CREDENTIALS_PATH`: Path to the OAuth credentials JSON file (default: `credentials.json`)
-- `EMAIL_TOKEN_PATH`: Path where the OAuth token will be stored (default: `token.json`)
+- `EMAIL_CLIENT_ID`: Gmail OAuth Client ID (from Google Cloud Console)
+- `EMAIL_CLIENT_SECRET`: Gmail OAuth Client Secret (from Google Cloud Console)
+- `EMAIL_REFRESH_TOKEN`: Gmail OAuth Refresh Token (obtained from OAuth flow)
 - `EMAIL_FROM_EMAIL`: The Gmail address to send emails from
 - `EMAIL_FROM_NAME`: Display name for the sender
 
@@ -119,22 +124,21 @@ curl -X POST http://localhost:8080/api/email/test \
 
 ## Troubleshooting
 
-### "Unable to read client secret file"
-- Make sure `credentials.json` exists in the specified path
-- Check that the path in `EMAIL_CREDENTIALS_PATH` is correct
-
-### "Unable to retrieve token from web"
-- Make sure you copied the entire authorization code
-- The code expires quickly, so paste it immediately after copying
+### "Unable to retrieve Gmail client"
+- Verify that `EMAIL_CLIENT_ID`, `EMAIL_CLIENT_SECRET`, and `EMAIL_REFRESH_TOKEN` are set correctly
+- Check that the refresh token is valid and hasn't been revoked
+- Ensure the Gmail API is enabled in your Google Cloud project
 
 ### "Failed to send email via Gmail API"
 - Verify that the Gmail API is enabled in your Google Cloud project
 - Check that the OAuth consent screen is properly configured
-- Ensure the token hasn't expired (refresh tokens are used automatically)
+- Ensure the refresh token is valid and hasn't expired
+- Verify that `EMAIL_FROM_EMAIL` matches the Gmail account associated with the refresh token
 
-### Token Expired
-- If the token expires, delete `token.json` and re-run the authorization flow
-- The refresh token should automatically renew the access token
+### Refresh Token Invalid
+- If the refresh token is invalid or expired, you need to generate a new one
+- Use the OAuth 2.0 Playground or a script to generate a new refresh token
+- Update `EMAIL_REFRESH_TOKEN` in your environment variables
 
 ## References
 

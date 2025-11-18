@@ -90,16 +90,17 @@ func main() {
 
 	// Initialize email service (Gmail API)
 	var emailHandler *email.Handler
-	if cfg.Email.CredentialsPath != "" {
+	if cfg.Email.ClientID != "" && cfg.Email.ClientSecret != "" && cfg.Email.RefreshToken != "" {
 		emailService, err := email.NewService(
-			cfg.Email.CredentialsPath,
-			cfg.Email.TokenPath,
+			cfg.Email.ClientID,
+			cfg.Email.ClientSecret,
+			cfg.Email.RefreshToken,
 			cfg.Email.FromEmail,
 			cfg.Email.FromName,
 		)
 		if err != nil {
 			log.Printf("Warning: Failed to initialize email service: %v", err)
-			log.Printf("Email functionality will be disabled. Make sure credentials.json is available.")
+			log.Printf("Email functionality will be disabled. Check your Gmail API credentials.")
 		} else {
 			emailHandler = email.NewHandler(emailService)
 		}

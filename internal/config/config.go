@@ -43,10 +43,11 @@ type AuthConfig struct {
 
 // EmailConfig holds email-related configuration for Gmail API
 type EmailConfig struct {
-	CredentialsPath string `mapstructure:"credentials_path"` // Path to credentials.json file
-	TokenPath       string `mapstructure:"token_path"`       // Path to token.json file (will be created automatically)
-	FromEmail       string `mapstructure:"from_email"`       // Sender email address
-	FromName        string `mapstructure:"from_name"`        // Sender name
+	ClientID     string `mapstructure:"client_id"`     // Gmail OAuth Client ID
+	ClientSecret string `mapstructure:"client_secret"` // Gmail OAuth Client Secret
+	RefreshToken string `mapstructure:"refresh_token"` // Gmail OAuth Refresh Token
+	FromEmail    string `mapstructure:"from_email"`    // Sender email address
+	FromName     string `mapstructure:"from_name"`     // Sender name
 }
 
 var (
@@ -111,8 +112,9 @@ func setDefaults() {
 	viper.SetDefault("auth.token_expiry", 24) // 24 hours
 
 	// Email defaults (Gmail API)
-	viper.SetDefault("email.credentials_path", "credentials.json")
-	viper.SetDefault("email.token_path", "token.json")
+	viper.SetDefault("email.client_id", "")
+	viper.SetDefault("email.client_secret", "")
+	viper.SetDefault("email.refresh_token", "")
 	viper.SetDefault("email.from_email", "")
 	viper.SetDefault("email.from_name", "Lam Phuong")
 }

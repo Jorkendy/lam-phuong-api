@@ -42,9 +42,13 @@ func NewRouter(locationHandler *location.Handler, userHandler *user.Handler, ema
 		userHandler.RegisterRoutes(api)
 
 		// Email test route (public)
-		if emailHandler != nil {
-			api.POST("/email/test", emailHandler.SendTestEmail)
-		}
+		api.POST("/email/test", func(c *gin.Context) {
+			if emailHandler == nil {
+				response.InternalError(c, "Email service is not configured. Please set EMAIL_CLIENT_ID, EMAIL_CLIENT_SECRET, and EMAIL_REFRESH_TOKEN environment variables.")
+				return
+			}
+			emailHandler.SendTestEmail(c)
+		})
 
 		// Protected routes (require authentication)
 		protected := api.Group("")
