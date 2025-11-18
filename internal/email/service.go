@@ -71,11 +71,11 @@ Best regards,
 // SendVerificationEmail sends an email verification link to the user
 func (s *Service) SendVerificationEmail(toEmail, verificationToken, baseURL string) error {
 	verificationURL := fmt.Sprintf("%s/verify-email?token=%s", baseURL, verificationToken)
-	
+
 	subject := "Verify Your Email Address"
 	body := fmt.Sprintf(`Hello,
 
-Thank you for registering with Lam Phuong API.
+Thank you for registering with %s.
 
 Please verify your email address by clicking the link below:
 
@@ -84,7 +84,7 @@ Please verify your email address by clicking the link below:
 If you did not create an account, please ignore this email.
 
 Best regards,
-%s`, verificationURL, s.fromName)
+%s`, s.fromName, verificationURL, s.fromName)
 
 	return s.sendEmail(toEmail, subject, body)
 }
