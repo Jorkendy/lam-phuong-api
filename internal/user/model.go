@@ -64,42 +64,6 @@ func (u *User) ToAirtableFields() map[string]interface{} {
 	return u.ToAirtableFieldsForCreate()
 }
 
-// FromAirtable maps an Airtable record to a User
-func FromAirtable(record map[string]interface{}) (*User, error) {
-	// Safely extract ID
-	id := ""
-	if idVal, ok := record["id"]; ok {
-		if idStr, ok := idVal.(string); ok {
-			id = idStr
-		}
-	}
-
-	// Safely extract fields
-	fields, ok := record["fields"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid record: missing or invalid 'fields'")
-	}
-
-	role := getStringField(fields, FieldRole)
-	if role == "" {
-		role = RoleUser // Default role
-	}
-
-	status := getStringField(fields, FieldStatus)
-	if status == "" {
-		status = StatusActive // Default to active for existing users
-	}
-
-	return &User{
-		ID:                    id,
-		Email:                 getStringField(fields, FieldEmail),
-		Password:              getStringField(fields, FieldPassword),
-		Role:                  role,
-		Status:                status,
-		EmailVerificationToken: getStringField(fields, FieldEmailVerificationToken),
-	}, nil
-}
-
 // HashPassword hashes a plain text password using bcrypt
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

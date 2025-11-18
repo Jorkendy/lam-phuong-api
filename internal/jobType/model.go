@@ -1,7 +1,5 @@
 package jobtype
 
-import "fmt"
-
 // Airtable field names
 const (
 	FieldName      = "Name"
@@ -47,29 +45,5 @@ type JobTypesResponseWrapper struct {
 // Deprecated: Use ToAirtableFieldsForCreate() instead
 func (jt *JobType) ToAirtableFields() map[string]interface{} {
 	return jt.ToAirtableFieldsForCreate()
-}
-
-// FromAirtable maps an Airtable record to a JobType.
-// The record should have an "id" field and a "fields" map.
-func FromAirtable(record map[string]interface{}) (*JobType, error) {
-	// Safely extract ID
-	id := ""
-	if idVal, ok := record["id"]; ok {
-		if idStr, ok := idVal.(string); ok {
-			id = idStr
-		}
-	}
-
-	// Safely extract fields
-	fields, ok := record["fields"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid record: missing or invalid 'fields'")
-	}
-
-	return &JobType{
-		ID:   id,
-		Name: getStringField(fields, FieldName),
-		Slug: getStringField(fields, FieldSlug),
-	}, nil
 }
 

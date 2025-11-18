@@ -1,7 +1,5 @@
 package productgroup
 
-import "fmt"
-
 // Airtable field names
 const (
 	FieldName      = "Name"
@@ -47,28 +45,4 @@ type ProductGroupsResponseWrapper struct {
 // Deprecated: Use ToAirtableFieldsForCreate() instead
 func (pg *ProductGroup) ToAirtableFields() map[string]interface{} {
 	return pg.ToAirtableFieldsForCreate()
-}
-
-// FromAirtable maps an Airtable record to a ProductGroup.
-// The record should have an "id" field and a "fields" map.
-func FromAirtable(record map[string]interface{}) (*ProductGroup, error) {
-	// Safely extract ID
-	id := ""
-	if idVal, ok := record["id"]; ok {
-		if idStr, ok := idVal.(string); ok {
-			id = idStr
-		}
-	}
-
-	// Safely extract fields
-	fields, ok := record["fields"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid record: missing or invalid 'fields'")
-	}
-
-	return &ProductGroup{
-		ID:   id,
-		Name: getStringField(fields, FieldName),
-		Slug: getStringField(fields, FieldSlug),
-	}, nil
 }
