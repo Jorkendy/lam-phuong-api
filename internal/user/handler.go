@@ -1,6 +1,7 @@
 package user
 
 import (
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -12,9 +13,13 @@ import (
 
 // Handler exposes HTTP handlers for the user resource
 type Handler struct {
-	repo        Repository
-	jwtSecret   string
-	tokenExpiry time.Duration
+	repo         Repository
+	jwtSecret    string
+	tokenExpiry  time.Duration
+	emailService interface {
+		SendVerificationEmail(toEmail, verificationToken, baseURL string) error
+	}
+	baseURL string
 }
 
 // NewHandler creates a handler with the provided repository
@@ -26,22 +31,31 @@ func NewHandler(repo Repository, jwtSecret string, tokenExpiry time.Duration) *H
 	}
 }
 
+// SetEmailService sets the email service and base URL for verification emails
+func (h *Handler) SetEmailService(emailService interface {
+	SendVerificationEmail(toEmail, verificationToken, baseURL string) error
+}, baseURL string) {
+	h.emailService = emailService
+	h.baseURL = baseURL
+}
+
 // RegisterRoutes attaches user routes to the supplied router group
 // Only registers public auth routes. Protected routes should be registered separately in router.go
 func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	// Public routes only
 	router.POST("/auth/register", h.RegisterHandler)
 	router.POST("/auth/login", h.LoginHandler)
+	router.GET("/auth/verify-email", h.VerifyEmailHandler)
 }
 
 // Register godoc
 // @Summary      User registration
-// @Description  Register a new user account with email and password. Returns JWT token for immediate use.
+// @Description  Register a new user account with email and password. A verification email will be sent to the provided email address. User must verify their email before logging in.
 // @Tags         auth
 // @Accept       json
 // @Produce      json
 // @Param        credentials  body      RegisterRequest  true  "Registration credentials"
-// @Success      201         {object}  user.TokenResponseWrapper  "User registered successfully"
+// @Success      201         {object}  user.UserResponseWrapper  "User registered successfully. Verification email sent."
 // @Failure      400         {object}  response.ErrorResponse  "Validation error"
 // @Failure      409         {object}  response.ErrorResponse  "Email already registered"
 // @Failure      500         {object}  response.ErrorResponse  "Internal server error"
@@ -69,12 +83,20 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	// Create user with default "User" role and active status
+	// Generate verification token
+	verificationToken, err := GenerateVerificationToken()
+	if err != nil {
+		response.InternalError(c, "Failed to generate verification token")
+		return
+	}
+
+	// Create user with default "User" role and pending status
 	user := User{
-		Email:    req.Email,
-		Password: hashedPassword,
-		Role:     RoleUser, // Always "User" role for public registration
-		Status:   StatusActive, // Set to active immediately
+		Email:                  req.Email,
+		Password:               hashedPassword,
+		Role:                   RoleUser,      // Always "User" role for public registration
+		Status:                 StatusPending, // Set to pending until email is verified
+		EmailVerificationToken: verificationToken,
 	}
 
 	// Create in repository (repository handles Airtable sync if configured)
@@ -89,29 +111,76 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	// Generate JWT token for immediate use (auto-login)
-	token, err := GenerateToken(created, h.jwtSecret, h.tokenExpiry)
-	if err != nil {
-		response.InternalError(c, "Failed to generate token")
+	// Send verification email if email service is configured
+	if h.emailService != nil && h.baseURL != "" {
+		if err := h.emailService.SendVerificationEmail(created.Email, verificationToken, h.baseURL); err != nil {
+			// Log error but don't fail registration - email can be resent later
+			log.Printf("Failed to send verification email: %v", err)
+		}
+	}
+
+	// Remove password and token from user object
+	created.Password = ""
+	created.EmailVerificationToken = ""
+
+	// Return success response (no auto-login, user needs to verify email first)
+	response.Success(c, http.StatusCreated, created, "User registered successfully. Please check your email to verify your account.")
+}
+
+// VerifyEmailHandler godoc
+// @Summary      Verify email address
+// @Description  Verify user's email address using verification token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        token  query     string  true  "Verification token"
+// @Success      200    {object}  response.Response  "Email verified successfully"
+// @Failure      400    {object}  response.ErrorResponse  "Invalid or missing token"
+// @Failure      404    {object}  response.ErrorResponse  "Token not found"
+// @Failure      500    {object}  response.ErrorResponse  "Internal server error"
+// @Router       /auth/verify-email [get]
+func (h *Handler) VerifyEmailHandler(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		response.BadRequest(c, "Verification token is required", nil)
 		return
 	}
 
-	// Remove password from user object
-	created.Password = ""
-
-	// Return token response
-	tokenResp := TokenResponse{
-		AccessToken: token,
-		TokenType:   "Bearer",
-		ExpiresIn:   int64(h.tokenExpiry.Seconds()),
-		User:        created,
+	// Find user by verification token
+	user, exists := h.repo.GetByVerificationToken(token)
+	if !exists {
+		response.NotFound(c, "Invalid or expired verification token")
+		return
 	}
-	response.Success(c, http.StatusCreated, tokenResp, "User registered successfully")
+
+	// Check if user is already verified
+	if user.Status == StatusActive {
+		response.Success(c, http.StatusOK, gin.H{
+			"email": user.Email,
+		}, "Email already verified")
+		return
+	}
+
+	// Update user status to active and clear verification token
+	user.Status = StatusActive
+	user.EmailVerificationToken = ""
+
+	updated, err := h.repo.Update(c.Request.Context(), user.ID, user)
+	if err != nil {
+		response.InternalError(c, "Failed to verify email: "+err.Error())
+		return
+	}
+
+	// Remove sensitive fields
+	updated.Password = ""
+	updated.EmailVerificationToken = ""
+
+	response.Success(c, http.StatusOK, updated, "Email verified successfully")
 }
 
 // Login godoc
 // @Summary      User login
-// @Description  Authenticate user with email and password, returns JWT token
+// @Description  Authenticate user with email and password, returns JWT token. User must have verified their email address (status must be Active, not Pending).
 // @Tags         auth
 // @Accept       json
 // @Produce      json
@@ -119,6 +188,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 // @Success      200         {object}  user.TokenResponseWrapper  "Login successful"
 // @Failure      400         {object}  response.ErrorResponse  "Validation error"
 // @Failure      401         {object}  response.ErrorResponse  "Invalid credentials"
+// @Failure      403         {object}  response.ErrorResponse  "Email not verified or account disabled"
 // @Router       /auth/login [post]
 func (h *Handler) LoginHandler(c *gin.Context) {
 	h.Login(c, h.jwtSecret, h.tokenExpiry)
@@ -146,13 +216,13 @@ func (h *Handler) ListUsers(c *gin.Context) {
 
 // CreateUser godoc
 // @Summary      Create a new user
-// @Description  Create a new user with email, password, and optional role (requires admin role)
+// @Description  Create a new user with email, password, and optional role (requires admin role). A verification email will be sent to the provided email address. User must verify their email before logging in.
 // @Tags         users
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
 // @Param        user  body      createUserPayload  true  "User payload"
-// @Success      201   {object}  user.UserResponseWrapper  "User created successfully"
+// @Success      201   {object}  user.UserResponseWrapper  "User created successfully. Verification email sent."
 // @Failure      400   {object}  response.ErrorResponse  "Validation error"
 // @Failure      401   {object}  response.ErrorResponse  "Unauthorized"
 // @Failure      403   {object}  response.ErrorResponse  "Forbidden"
@@ -196,12 +266,20 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		}
 	}
 
-	// Create user with active status
+	// Generate verification token
+	verificationToken, err := GenerateVerificationToken()
+	if err != nil {
+		response.InternalError(c, "Failed to generate verification token")
+		return
+	}
+
+	// Create user with pending status (requires email verification)
 	user := User{
-		Email:    payload.Email,
-		Password: hashedPassword,
-		Role:     role,
-		Status:   StatusActive, // Set to active immediately
+		Email:                  payload.Email,
+		Password:               hashedPassword,
+		Role:                   role,
+		Status:                 StatusPending, // Set to pending until email is verified
+		EmailVerificationToken: verificationToken,
 	}
 
 	// Create in repository (repository handles Airtable sync if configured)
@@ -216,10 +294,19 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		return
 	}
 
+	// Send verification email if email service is configured
+	if h.emailService != nil && h.baseURL != "" {
+		if err := h.emailService.SendVerificationEmail(created.Email, verificationToken, h.baseURL); err != nil {
+			// Log error but don't fail user creation - email can be resent later
+			log.Printf("Failed to send verification email: %v", err)
+		}
+	}
+
 	// Remove sensitive fields from response
 	created.Password = ""
+	created.EmailVerificationToken = ""
 
-	response.Success(c, http.StatusCreated, created, "User created successfully")
+	response.Success(c, http.StatusCreated, created, "User created successfully. Verification email has been sent.")
 }
 
 // DeleteUser godoc

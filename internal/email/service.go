@@ -68,6 +68,27 @@ Best regards,
 	return s.sendEmail(toEmail, subject, body)
 }
 
+// SendVerificationEmail sends an email verification link to the user
+func (s *Service) SendVerificationEmail(toEmail, verificationToken, baseURL string) error {
+	verificationURL := fmt.Sprintf("%s/verify-email?token=%s", baseURL, verificationToken)
+	
+	subject := "Verify Your Email Address"
+	body := fmt.Sprintf(`Hello,
+
+Thank you for registering with Lam Phuong API.
+
+Please verify your email address by clicking the link below:
+
+%s
+
+If you did not create an account, please ignore this email.
+
+Best regards,
+%s`, verificationURL, s.fromName)
+
+	return s.sendEmail(toEmail, subject, body)
+}
+
 // sendEmail sends an email using Gmail API
 func (s *Service) sendEmail(toEmail, subject, body string) error {
 	// Validate email addresses

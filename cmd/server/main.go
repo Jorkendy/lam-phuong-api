@@ -89,9 +89,11 @@ func main() {
 	userHandler := user.NewHandler(userRepo, cfg.Auth.JWTSecret, tokenExpiry)
 
 	// Initialize email service (Gmail API)
+	var emailService *email.Service
 	var emailHandler *email.Handler
 	if cfg.Email.ClientID != "" && cfg.Email.ClientSecret != "" && cfg.Email.RefreshToken != "" {
-		emailService, err := email.NewService(
+		var err error
+		emailService, err = email.NewService(
 			cfg.Email.ClientID,
 			cfg.Email.ClientSecret,
 			cfg.Email.RefreshToken,
@@ -103,6 +105,10 @@ func main() {
 			log.Printf("Email functionality will be disabled. Check your Gmail API credentials.")
 		} else {
 			emailHandler = email.NewHandler(emailService)
+			// Set email service for user handler to send verification emails
+			if cfg.Email.BaseURL != "" {
+				userHandler.SetEmailService(emailService, cfg.Email.BaseURL)
+			}
 		}
 	}
 

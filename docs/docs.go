@@ -26,7 +26,7 @@ const docTemplate = `{
     "paths": {
         "/auth/login": {
             "post": {
-                "description": "Authenticate user with email and password, returns JWT token",
+                "description": "Authenticate user with email and password, returns JWT token. User must have verified their email address (status must be Active, not Pending).",
                 "consumes": [
                     "application/json"
                 ],
@@ -66,13 +66,19 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/response.ErrorResponse"
                         }
+                    },
+                    "403": {
+                        "description": "Email not verified or account disabled",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
                     }
                 }
             }
         },
         "/auth/register": {
             "post": {
-                "description": "Register a new user account with email and password. Returns JWT token for immediate use.",
+                "description": "Register a new user account with email and password. A verification email will be sent to the provided email address. User must verify their email before logging in.",
                 "consumes": [
                     "application/json"
                 ],
@@ -96,9 +102,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "User registered successfully",
+                        "description": "User registered successfully. Verification email sent.",
                         "schema": {
-                            "$ref": "#/definitions/user.TokenResponseWrapper"
+                            "$ref": "#/definitions/user.UserResponseWrapper"
                         }
                     },
                     "400": {
@@ -109,6 +115,102 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Email already registered",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/verify-email": {
+            "get": {
+                "description": "Verify user's email address using verification token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Verify email address",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Verification token",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Email verified successfully",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing token",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Token not found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/email/test": {
+            "post": {
+                "description": "Send a test email to the specified email address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "email"
+                ],
+                "summary": "Send test email",
+                "parameters": [
+                    {
+                        "description": "Test email request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/email.TestEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Test email sent successfully",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorResponse"
                         }
@@ -311,7 +413,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new user with email, password, and optional role (requires admin role)",
+                "description": "Create a new user with email, password, and optional role (requires admin role). A verification email will be sent to the provided email address. User must verify their email before logging in.",
                 "consumes": [
                     "application/json"
                 ],
@@ -335,7 +437,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "User created successfully",
+                        "description": "User created successfully. Verification email sent.",
                         "schema": {
                             "$ref": "#/definitions/user.UserResponseWrapper"
                         }
@@ -380,7 +482,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a user's role and/or password by ID (requires super admin role)",
+                "description": "Update a user's role, password, and/or status by ID (requires super admin role). Status can be: pending, active, or disabled.",
                 "consumes": [
                     "application/json"
                 ],
@@ -390,7 +492,7 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Update user role and password",
+                "summary": "Update user role, password, and status",
                 "parameters": [
                     {
                         "type": "string",
@@ -400,7 +502,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Update payload (role and/or password)",
+                        "description": "Update payload (role, password, and/or status)",
                         "name": "user",
                         "in": "body",
                         "required": true,
@@ -504,6 +606,17 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "email.TestEmailRequest": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
         "location.Location": {
             "type": "object",
             "properties": {
@@ -699,6 +812,10 @@ const docTemplate = `{
                 },
                 "role": {
                     "type": "string"
+                },
+                "status": {
+                    "description": "\"pending\", \"active\", or \"disabled\"",
+                    "type": "string"
                 }
             }
         },
@@ -767,6 +884,10 @@ const docTemplate = `{
                 },
                 "role": {
                     "description": "Optional, must be valid role if provided",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Optional, must be: pending, active, or disabled",
                     "type": "string"
                 }
             }

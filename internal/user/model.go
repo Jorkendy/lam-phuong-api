@@ -1,6 +1,8 @@
 package user
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -12,14 +14,16 @@ import (
 const (
 	FieldEmail                  = "Email"
 	FieldPassword               = "Password"
-	FieldRole      = "Role"
-	FieldStatus    = "Status"
-	FieldCreatedAt = "Created At"
-	FieldUpdatedAt = "Updated At"
+	FieldRole                   = "Role"
+	FieldStatus                 = "Status"
+	FieldEmailVerificationToken = "Email Verification Token"
+	FieldCreatedAt              = "Created At"
+	FieldUpdatedAt              = "Updated At"
 )
 
 // User status constants
 const (
+	StatusPending  = "Pending"
 	StatusActive   = "Active"
 	StatusDisabled = "Disabled"
 )
@@ -46,11 +50,12 @@ func getStringField(fields map[string]interface{}, key string) string {
 
 // User represents a user in the system
 type User struct {
-	ID       string `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"-"` // Never serialize password in JSON responses
-	Role     string `json:"role"`
-	Status   string `json:"status"` // "active" or "disabled"
+	ID                    string `json:"id"`
+	Email                 string `json:"email"`
+	Password              string `json:"-"` // Never serialize password in JSON responses
+	Role                  string `json:"role"`
+	Status                string `json:"status"` // "pending", "active", or "disabled"
+	EmailVerificationToken string `json:"-"` // Never serialize verification token in JSON responses
 }
 
 // ToAirtableFields converts a User to Airtable fields format (for creation)
@@ -82,15 +87,16 @@ func FromAirtable(record map[string]interface{}) (*User, error) {
 
 	status := getStringField(fields, FieldStatus)
 	if status == "" {
-		status = StatusActive // Default to active for new users
+		status = StatusActive // Default to active for existing users
 	}
 
 	return &User{
-		ID:       id,
-		Email:    getStringField(fields, FieldEmail),
-		Password: getStringField(fields, FieldPassword),
-		Role:     role,
-		Status:   status,
+		ID:                    id,
+		Email:                 getStringField(fields, FieldEmail),
+		Password:              getStringField(fields, FieldPassword),
+		Role:                  role,
+		Status:                status,
+		EmailVerificationToken: getStringField(fields, FieldEmailVerificationToken),
 	}, nil
 }
 
@@ -186,4 +192,13 @@ func ValidateToken(tokenString, secretKey string) (*Claims, error) {
 	}
 
 	return claims, nil
+}
+
+// GenerateVerificationToken generates a secure random token for email verification
+func GenerateVerificationToken() (string, error) {
+	bytes := make([]byte, 32) // 256 bits
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate verification token: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
 }

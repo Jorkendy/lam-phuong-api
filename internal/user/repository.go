@@ -17,6 +17,7 @@ type Repository interface {
 	Update(ctx context.Context, id string, user User) (User, error)
 	Delete(id string) bool
 	GetByEmail(email string) (User, bool)
+	GetByVerificationToken(token string) (User, bool)
 }
 
 // AirtableRepository implements Repository interface using Airtable as the data store
@@ -141,13 +142,48 @@ func (r *AirtableRepository) GetByEmail(email string) (User, bool) {
 	return User{}, false
 }
 
+// GetByVerificationToken retrieves a user by verification token from Airtable
+func (r *AirtableRepository) GetByVerificationToken(token string) (User, bool) {
+	if token == "" {
+		return User{}, false
+	}
+
+	filter := fmt.Sprintf(
+		"{%s} = '%s'",
+		FieldEmailVerificationToken,
+		escapeAirtableFormulaValue(token),
+	)
+
+	records, err := r.airtableClient.ListRecords(
+		context.Background(),
+		r.airtableTable,
+		&airtable.ListParams{
+			PageSize:        1,
+			FilterByFormula: filter,
+		},
+	)
+	if err != nil {
+		log.Printf("Failed to find user by verification token in Airtable: %v", err)
+		return User{}, false
+	}
+
+	if len(records) > 0 {
+		user, mapErr := mapAirtableRecord(records[0])
+		if mapErr == nil {
+			return user, true
+		}
+		log.Printf("Failed to map Airtable user for verification token: %v", mapErr)
+	}
+
+	return User{}, false
+}
 
 // Update updates an existing user in Airtable
 func (r *AirtableRepository) Update(ctx context.Context, id string, updatedUser User) (User, error) {
 	// Get existing user to preserve email
 	existingUser, exists := r.Get(id)
-	if !exists {
-		return User{}, fmt.Errorf("user with id %s not found", id)
+		if !exists {
+			return User{}, fmt.Errorf("user with id %s not found", id)
 	}
 
 	// Preserve email (should not be changed via update)
@@ -193,11 +229,12 @@ func mapAirtableRecord(record airtable.Record) (User, error) {
 		status = StatusActive // Default to active
 	}
 	return User{
-		ID:       record.ID,
-		Email:    getStringField(record.Fields, FieldEmail),
-		Password: getStringField(record.Fields, FieldPassword),
-		Role:     role,
-		Status:   status,
+		ID:                    record.ID,
+		Email:                 getStringField(record.Fields, FieldEmail),
+		Password:              getStringField(record.Fields, FieldPassword),
+		Role:                  role,
+		Status:                status,
+		EmailVerificationToken: getStringField(record.Fields, FieldEmailVerificationToken),
 	}, nil
 }
 

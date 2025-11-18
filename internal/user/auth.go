@@ -82,6 +82,12 @@ func (h *Handler) Login(c *gin.Context, jwtSecret string, tokenExpiry time.Durat
 		return
 	}
 
+	// Check if user email is not verified
+	if user.Status == StatusPending {
+		response.Error(c, http.StatusForbidden, response.ErrCodeForbidden, "Please verify your email address before logging in", nil)
+		return
+	}
+
 	// Verify password
 	if !CheckPassword(user.Password, req.Password) {
 		response.InvalidAuth(c, "Invalid email or password")

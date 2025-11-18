@@ -1,5 +1,12 @@
 basePath: /api
 definitions:
+  email.TestEmailRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
   location.Location:
     properties:
       id:
@@ -135,6 +142,9 @@ definitions:
         type: string
       role:
         type: string
+      status:
+        description: '"pending", "active", or "disabled"'
+        type: string
     type: object
   user.UserResponseWrapper:
     description: Response containing a single user
@@ -183,6 +193,9 @@ definitions:
       role:
         description: Optional, must be valid role if provided
         type: string
+      status:
+        description: 'Optional, must be: pending, active, or disabled'
+        type: string
     type: object
 host: localhost:8080
 info:
@@ -202,7 +215,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Authenticate user with email and password, returns JWT token
+      description: Authenticate user with email and password, returns JWT token. User
+        must have verified their email address (status must be Active, not Pending).
       parameters:
       - description: Login credentials
         in: body
@@ -225,6 +239,10 @@ paths:
           description: Invalid credentials
           schema:
             $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Email not verified or account disabled
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       summary: User login
       tags:
       - auth
@@ -232,8 +250,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Register a new user account with email and password. Returns JWT
-        token for immediate use.
+      description: Register a new user account with email and password. A verification
+        email will be sent to the provided email address. User must verify their email
+        before logging in.
       parameters:
       - description: Registration credentials
         in: body
@@ -245,9 +264,9 @@ paths:
       - application/json
       responses:
         "201":
-          description: User registered successfully
+          description: User registered successfully. Verification email sent.
           schema:
-            $ref: '#/definitions/user.TokenResponseWrapper'
+            $ref: '#/definitions/user.UserResponseWrapper'
         "400":
           description: Validation error
           schema:
@@ -263,6 +282,69 @@ paths:
       summary: User registration
       tags:
       - auth
+  /auth/verify-email:
+    get:
+      consumes:
+      - application/json
+      description: Verify user's email address using verification token
+      parameters:
+      - description: Verification token
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Email verified successfully
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Invalid or missing token
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Token not found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Verify email address
+      tags:
+      - auth
+  /email/test:
+    post:
+      consumes:
+      - application/json
+      description: Send a test email to the specified email address
+      parameters:
+      - description: Test email request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/email.TestEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Test email sent successfully
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Send test email
+      tags:
+      - email
   /locations:
     get:
       consumes:
@@ -384,7 +466,8 @@ paths:
       consumes:
       - application/json
       description: Create a new user with email, password, and optional role (requires
-        admin role)
+        admin role). A verification email will be sent to the provided email address.
+        User must verify their email before logging in.
       parameters:
       - description: User payload
         in: body
@@ -396,7 +479,7 @@ paths:
       - application/json
       responses:
         "201":
-          description: User created successfully
+          description: User created successfully. Verification email sent.
           schema:
             $ref: '#/definitions/user.UserResponseWrapper'
         "400":
@@ -462,15 +545,15 @@ paths:
     put:
       consumes:
       - application/json
-      description: Update a user's role and/or password by ID (requires super admin
-        role)
+      description: 'Update a user''s role, password, and/or status by ID (requires
+        super admin role). Status can be: pending, active, or disabled.'
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
         type: string
-      - description: Update payload (role and/or password)
+      - description: Update payload (role, password, and/or status)
         in: body
         name: user
         required: true
@@ -505,7 +588,7 @@ paths:
             $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update user role and password
+      summary: Update user role, password, and status
       tags:
       - users
 schemes:

@@ -48,6 +48,7 @@ type EmailConfig struct {
 	RefreshToken string `mapstructure:"refresh_token"` // Gmail OAuth Refresh Token
 	FromEmail    string `mapstructure:"from_email"`    // Sender email address
 	FromName     string `mapstructure:"from_name"`     // Sender name
+	BaseURL      string `mapstructure:"base_url"`      // Base URL for verification links
 }
 
 var (
@@ -117,6 +118,7 @@ func setDefaults() {
 	viper.SetDefault("email.refresh_token", "")
 	viper.SetDefault("email.from_email", "")
 	viper.SetDefault("email.from_name", "Lam Phuong")
+	viper.SetDefault("email.base_url", "http://localhost:3000")
 }
 
 // Validate checks if required configuration values are set
