@@ -13,6 +13,9 @@ import (
 type Repository interface {
 	List() []JobType
 	Create(ctx context.Context, jobType JobType) (JobType, error)
+	Get(id string) (JobType, bool)
+	GetBySlug(slug string) (JobType, bool)
+	Update(ctx context.Context, id string, jobType JobType) (JobType, error)
 	DeleteBySlug(slug string) bool
 }
 
@@ -99,11 +102,78 @@ func (r *AirtableRepository) DeleteBySlug(slug string) bool {
 	return true
 }
 
+// Get retrieves a job type by ID from Airtable
+func (r *AirtableRepository) Get(id string) (JobType, bool) {
+	record, err := r.airtableClient.GetRecord(context.Background(), r.airtableTable, id)
+	if err != nil {
+		log.Printf("Failed to get job type from Airtable: %v", err)
+		return JobType{}, false
+	}
+
+	jt, err := mapAirtableRecord(record)
+	if err != nil {
+		log.Printf("Failed to map Airtable record: %v", err)
+		return JobType{}, false
+	}
+
+	return jt, true
+}
+
+// GetBySlug retrieves a job type by slug from Airtable
+func (r *AirtableRepository) GetBySlug(slug string) (JobType, bool) {
+	filterValue := escapeAirtableFormulaValue(slug)
+	params := &airtable.ListParams{
+		FilterByFormula: fmt.Sprintf("{%s} = '%s'", FieldSlug, filterValue),
+	}
+
+	records, err := r.airtableClient.ListRecords(context.Background(), r.airtableTable, params)
+	if err != nil {
+		log.Printf("Failed to query Airtable for slug %s: %v", slug, err)
+		return JobType{}, false
+	}
+
+	if len(records) == 0 {
+		return JobType{}, false
+	}
+
+	jt, err := mapAirtableRecord(records[0])
+	if err != nil {
+		log.Printf("Failed to map Airtable record: %v", err)
+		return JobType{}, false
+	}
+
+	return jt, true
+}
+
+// Update updates a job type in Airtable
+func (r *AirtableRepository) Update(ctx context.Context, id string, jobType JobType) (JobType, error) {
+	airtableFields := jobType.ToAirtableFieldsForUpdate()
+	log.Printf("Attempting to update job type in Airtable table: %s", r.airtableTable)
+	airtableRecord, err := r.airtableClient.UpdateRecordPartial(ctx, r.airtableTable, id, airtableFields)
+	if err != nil {
+		log.Printf("Failed to update job type in Airtable: %v", err)
+		return JobType{}, fmt.Errorf("failed to update job type in Airtable: %w", err)
+	}
+
+	updated, err := mapAirtableRecord(airtableRecord)
+	if err != nil {
+		return JobType{}, fmt.Errorf("failed to map updated job type: %w", err)
+	}
+
+	log.Printf("Job type updated in Airtable successfully with ID: %s", id)
+	return updated, nil
+}
+
 func mapAirtableRecord(record airtable.Record) (JobType, error) {
+	status := getStringField(record.Fields, FieldStatus)
+	if status == "" {
+		status = StatusActive // Default to Active if not set
+	}
 	return JobType{
-		ID:   record.ID,
-		Name: getStringField(record.Fields, FieldName),
-		Slug: getStringField(record.Fields, FieldSlug),
+		ID:     record.ID,
+		Name:   getStringField(record.Fields, FieldName),
+		Slug:   getStringField(record.Fields, FieldSlug),
+		Status: status,
 	}, nil
 }
 

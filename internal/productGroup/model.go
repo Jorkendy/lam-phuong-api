@@ -6,8 +6,15 @@ import "fmt"
 const (
 	FieldName      = "Name"
 	FieldSlug      = "Slug"
+	FieldStatus    = "Status"
 	FieldCreatedAt = "Created At"
 	FieldUpdatedAt = "Updated At"
+)
+
+// Status constants
+const (
+	StatusActive   = "Active"
+	StatusDisabled = "Disabled"
 )
 
 // Helper functions
@@ -22,25 +29,26 @@ func getStringField(fields map[string]interface{}, key string) string {
 
 // ProductGroup represents a product group/category.
 type ProductGroup struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Slug string `json:"slug"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Slug   string `json:"slug"`
+	Status string `json:"status"`
 }
 
 // ProductGroupResponseWrapper wraps ProductGroup in the standard API response format for Swagger
 // @Description Response containing a single product group
 type ProductGroupResponseWrapper struct {
-	Success bool        `json:"success" example:"true"`
+	Success bool         `json:"success" example:"true"`
 	Data    ProductGroup `json:"data"`
-	Message string      `json:"message" example:"Product group retrieved successfully"`
+	Message string       `json:"message" example:"Product group retrieved successfully"`
 }
 
 // ProductGroupsResponseWrapper wraps array of ProductGroups in the standard API response format for Swagger
 // @Description Response containing a list of product groups
 type ProductGroupsResponseWrapper struct {
-	Success bool          `json:"success" example:"true"`
+	Success bool           `json:"success" example:"true"`
 	Data    []ProductGroup `json:"data"`
-	Message string        `json:"message" example:"Product groups retrieved successfully"`
+	Message string         `json:"message" example:"Product groups retrieved successfully"`
 }
 
 // ToAirtableFields converts a ProductGroup to Airtable fields format (for creation)
@@ -66,10 +74,15 @@ func FromAirtable(record map[string]interface{}) (*ProductGroup, error) {
 		return nil, fmt.Errorf("invalid record: missing or invalid 'fields'")
 	}
 
+	status := getStringField(fields, FieldStatus)
+	if status == "" {
+		status = StatusActive // Default to Active if not set
+	}
+
 	return &ProductGroup{
-		ID:   id,
-		Name: getStringField(fields, FieldName),
-		Slug: getStringField(fields, FieldSlug),
+		ID:     id,
+		Name:   getStringField(fields, FieldName),
+		Slug:   getStringField(fields, FieldSlug),
+		Status: status,
 	}, nil
 }
-

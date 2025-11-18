@@ -13,6 +13,9 @@ import (
 type Repository interface {
 	List() []ProductGroup
 	Create(ctx context.Context, productGroup ProductGroup) (ProductGroup, error)
+	Get(id string) (ProductGroup, bool)
+	GetBySlug(slug string) (ProductGroup, bool)
+	Update(ctx context.Context, id string, productGroup ProductGroup) (ProductGroup, error)
 	DeleteBySlug(slug string) bool
 }
 
@@ -99,11 +102,78 @@ func (r *AirtableRepository) DeleteBySlug(slug string) bool {
 	return true
 }
 
+// Get retrieves a product group by ID from Airtable
+func (r *AirtableRepository) Get(id string) (ProductGroup, bool) {
+	record, err := r.airtableClient.GetRecord(context.Background(), r.airtableTable, id)
+	if err != nil {
+		log.Printf("Failed to get product group from Airtable: %v", err)
+		return ProductGroup{}, false
+	}
+
+	pg, err := mapAirtableRecord(record)
+	if err != nil {
+		log.Printf("Failed to map Airtable record: %v", err)
+		return ProductGroup{}, false
+	}
+
+	return pg, true
+}
+
+// GetBySlug retrieves a product group by slug from Airtable
+func (r *AirtableRepository) GetBySlug(slug string) (ProductGroup, bool) {
+	filterValue := escapeAirtableFormulaValue(slug)
+	params := &airtable.ListParams{
+		FilterByFormula: fmt.Sprintf("{%s} = '%s'", FieldSlug, filterValue),
+	}
+
+	records, err := r.airtableClient.ListRecords(context.Background(), r.airtableTable, params)
+	if err != nil {
+		log.Printf("Failed to query Airtable for slug %s: %v", slug, err)
+		return ProductGroup{}, false
+	}
+
+	if len(records) == 0 {
+		return ProductGroup{}, false
+	}
+
+	pg, err := mapAirtableRecord(records[0])
+	if err != nil {
+		log.Printf("Failed to map Airtable record: %v", err)
+		return ProductGroup{}, false
+	}
+
+	return pg, true
+}
+
+// Update updates a product group in Airtable
+func (r *AirtableRepository) Update(ctx context.Context, id string, productGroup ProductGroup) (ProductGroup, error) {
+	airtableFields := productGroup.ToAirtableFieldsForUpdate()
+	log.Printf("Attempting to update product group in Airtable table: %s", r.airtableTable)
+	airtableRecord, err := r.airtableClient.UpdateRecordPartial(ctx, r.airtableTable, id, airtableFields)
+	if err != nil {
+		log.Printf("Failed to update product group in Airtable: %v", err)
+		return ProductGroup{}, fmt.Errorf("failed to update product group in Airtable: %w", err)
+	}
+
+	updated, err := mapAirtableRecord(airtableRecord)
+	if err != nil {
+		return ProductGroup{}, fmt.Errorf("failed to map updated product group: %w", err)
+	}
+
+	log.Printf("Product group updated in Airtable successfully with ID: %s", id)
+	return updated, nil
+}
+
 func mapAirtableRecord(record airtable.Record) (ProductGroup, error) {
+	status := getStringField(record.Fields, FieldStatus)
+	if status == "" {
+		status = StatusActive // Default to Active if not set
+	}
 	return ProductGroup{
-		ID:   record.ID,
-		Name: getStringField(record.Fields, FieldName),
-		Slug: getStringField(record.Fields, FieldSlug),
+		ID:     record.ID,
+		Name:   getStringField(record.Fields, FieldName),
+		Slug:   getStringField(record.Fields, FieldSlug),
+		Status: status,
 	}, nil
 }
 

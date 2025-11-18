@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gosimple/slug"
 	"lam-phuong-api/internal/response"
+	"lam-phuong-api/internal/user"
 )
 
 // Handler exposes HTTP handlers for the job type resource.
@@ -26,6 +27,7 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/job-types", h.ListJobTypes)
 	router.POST("/job-types", h.CreateJobType)
 	router.DELETE("/job-types/:slug", h.DeleteJobTypeBySlug)
+	router.POST("/job-types/:slug/toggle-status", h.ToggleJobTypeStatus)
 }
 
 // ListJobTypes godoc
@@ -149,5 +151,71 @@ func (h *Handler) DeleteJobTypeBySlug(c *gin.Context) {
 	}
 
 	response.SuccessNoContent(c, "Job type deleted successfully")
+}
+
+// ToggleJobTypeStatus godoc
+// @Summary      Toggle job type status
+// @Description  Toggle a job type's status between Active and Disabled. Only Admin or Super Admin can call this endpoint.
+// @Tags         job-types
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug  path      string  true  "Job type slug"
+// @Success      200   {object}  jobtype.JobTypeResponseWrapper  "Job type status toggled successfully"
+// @Failure      400   {object}  response.ErrorResponse  "Validation error"
+// @Failure      401   {object}  response.ErrorResponse  "Unauthorized"
+// @Failure      403   {object}  response.ErrorResponse  "Forbidden - Admin or Super Admin role required"
+// @Failure      404   {object}  response.ErrorResponse  "Job type not found"
+// @Failure      500   {object}  response.ErrorResponse  "Internal server error"
+// @Router       /job-types/{slug}/toggle-status [post]
+func (h *Handler) ToggleJobTypeStatus(c *gin.Context) {
+	// Check if user has admin role
+	userRole, exists := c.Get("user_role")
+	if !exists {
+		response.Unauthorized(c, "User role not found")
+		return
+	}
+	role := userRole.(string)
+	if role != user.RoleAdmin && role != user.RoleSuperAdmin {
+		response.Forbidden(c, "Admin or Super Admin role required")
+		return
+	}
+
+	slugParam := c.Param("slug")
+	if slugParam == "" {
+		response.BadRequest(c, "Job type slug is required", nil)
+		return
+	}
+
+	normalizedSlug := slug.Make(slugParam)
+	if normalizedSlug == "" {
+		response.ValidationError(c, "Invalid slug format", nil)
+		return
+	}
+
+	// Get existing job type by slug
+	existingJobType, exists := h.repo.GetBySlug(normalizedSlug)
+	if !exists {
+		response.NotFound(c, "Job type")
+		return
+	}
+
+	// Toggle status between Active and Disabled
+	var newStatus string
+	if existingJobType.Status == StatusActive {
+		newStatus = StatusDisabled
+	} else {
+		newStatus = StatusActive
+	}
+
+	// Update job type status
+	existingJobType.Status = newStatus
+	updated, err := h.repo.Update(c.Request.Context(), existingJobType.ID, existingJobType)
+	if err != nil {
+		response.InternalError(c, "Failed to update job type status: "+err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, updated, "Job type status toggled successfully")
 }
 

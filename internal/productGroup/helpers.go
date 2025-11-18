@@ -5,9 +5,14 @@ import "time"
 // ToAirtableFieldsForCreate converts a ProductGroup to Airtable fields format for creation
 func (pg *ProductGroup) ToAirtableFieldsForCreate() map[string]interface{} {
 	now := time.Now().Format(time.RFC3339)
+	status := pg.Status
+	if status == "" {
+		status = StatusActive // Default to Active if not set
+	}
 	return map[string]interface{}{
 		FieldName:      pg.Name,
 		FieldSlug:      pg.Slug,
+		FieldStatus:    status,
 		FieldCreatedAt: now,
 		FieldUpdatedAt: now,
 	}
@@ -19,6 +24,7 @@ func (pg *ProductGroup) ToAirtableFieldsForUpdate() map[string]interface{} {
 	return map[string]interface{}{
 		FieldName:      pg.Name,
 		FieldSlug:      pg.Slug,
+		FieldStatus:    pg.Status,
 		FieldUpdatedAt: now,
 	}
 }

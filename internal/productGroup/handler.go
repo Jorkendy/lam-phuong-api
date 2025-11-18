@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gosimple/slug"
 	"lam-phuong-api/internal/response"
+	"lam-phuong-api/internal/user"
 )
 
 // Handler exposes HTTP handlers for the product group resource.
@@ -26,6 +27,7 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/product-groups", h.ListProductGroups)
 	router.POST("/product-groups", h.CreateProductGroup)
 	router.DELETE("/product-groups/:slug", h.DeleteProductGroupBySlug)
+	router.POST("/product-groups/:slug/toggle-status", h.ToggleProductGroupStatus)
 }
 
 // ListProductGroups godoc
@@ -149,5 +151,71 @@ func (h *Handler) DeleteProductGroupBySlug(c *gin.Context) {
 	}
 
 	response.SuccessNoContent(c, "Product group deleted successfully")
+}
+
+// ToggleProductGroupStatus godoc
+// @Summary      Toggle product group status
+// @Description  Toggle a product group's status between Active and Disabled. Only Admin or Super Admin can call this endpoint.
+// @Tags         product-groups
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug  path      string  true  "Product group slug"
+// @Success      200   {object}  productgroup.ProductGroupResponseWrapper  "Product group status toggled successfully"
+// @Failure      400   {object}  response.ErrorResponse  "Validation error"
+// @Failure      401   {object}  response.ErrorResponse  "Unauthorized"
+// @Failure      403   {object}  response.ErrorResponse  "Forbidden - Admin or Super Admin role required"
+// @Failure      404   {object}  response.ErrorResponse  "Product group not found"
+// @Failure      500   {object}  response.ErrorResponse  "Internal server error"
+// @Router       /product-groups/{slug}/toggle-status [post]
+func (h *Handler) ToggleProductGroupStatus(c *gin.Context) {
+	// Check if user has admin role
+	userRole, exists := c.Get("user_role")
+	if !exists {
+		response.Unauthorized(c, "User role not found")
+		return
+	}
+	role := userRole.(string)
+	if role != user.RoleAdmin && role != user.RoleSuperAdmin {
+		response.Forbidden(c, "Admin or Super Admin role required")
+		return
+	}
+
+	slugParam := c.Param("slug")
+	if slugParam == "" {
+		response.BadRequest(c, "Product group slug is required", nil)
+		return
+	}
+
+	normalizedSlug := slug.Make(slugParam)
+	if normalizedSlug == "" {
+		response.ValidationError(c, "Invalid slug format", nil)
+		return
+	}
+
+	// Get existing product group by slug
+	existingProductGroup, exists := h.repo.GetBySlug(normalizedSlug)
+	if !exists {
+		response.NotFound(c, "Product group")
+		return
+	}
+
+	// Toggle status between Active and Disabled
+	var newStatus string
+	if existingProductGroup.Status == StatusActive {
+		newStatus = StatusDisabled
+	} else {
+		newStatus = StatusActive
+	}
+
+	// Update product group status
+	existingProductGroup.Status = newStatus
+	updated, err := h.repo.Update(c.Request.Context(), existingProductGroup.ID, existingProductGroup)
+	if err != nil {
+		response.InternalError(c, "Failed to update product group status: "+err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, updated, "Product group status toggled successfully")
 }
 
