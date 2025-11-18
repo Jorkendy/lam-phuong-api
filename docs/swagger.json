@@ -429,6 +429,150 @@
                 }
             }
         },
+        "/product-groups": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of all product groups (requires authentication)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-groups"
+                ],
+                "summary": "List all product groups",
+                "responses": {
+                    "200": {
+                        "description": "Product groups retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/productgroup.ProductGroupsResponseWrapper"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new product group with name and optional slug. If slug is not provided, it will be generated from the name. (requires authentication)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-groups"
+                ],
+                "summary": "Create a new product group",
+                "parameters": [
+                    {
+                        "description": "Product group payload",
+                        "name": "productGroup",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/productgroup.productGroupPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Product group created successfully",
+                        "schema": {
+                            "$ref": "#/definitions/productgroup.ProductGroupResponseWrapper"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/product-groups/{slug}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a product group using its slug (requires authentication)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-groups"
+                ],
+                "summary": "Delete a product group by slug",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product group slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Product group deleted successfully",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Product group not found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/users": {
             "get": {
                 "security": [
@@ -873,6 +1017,73 @@
             }
         },
         "location.locationPayload": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "description": "Required",
+                    "type": "string"
+                },
+                "slug": {
+                    "description": "Optional, will be generated from name if not provided",
+                    "type": "string"
+                }
+            }
+        },
+        "productgroup.ProductGroup": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "productgroup.ProductGroupResponseWrapper": {
+            "description": "Response containing a single product group",
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/productgroup.ProductGroup"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Product group retrieved successfully"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "productgroup.ProductGroupsResponseWrapper": {
+            "description": "Response containing a list of product groups",
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/productgroup.ProductGroup"
+                    }
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Product groups retrieved successfully"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "productgroup.productGroupPayload": {
             "type": "object",
             "required": [
                 "name"

@@ -10,6 +10,7 @@ import (
 	"lam-phuong-api/internal/config"
 	"lam-phuong-api/internal/email"
 	"lam-phuong-api/internal/location"
+	productGroup "lam-phuong-api/internal/productGroup"
 	"lam-phuong-api/internal/server"
 	"lam-phuong-api/internal/user"
 )
@@ -82,6 +83,9 @@ func main() {
 	locationRepo := location.NewAirtableRepository(airtableClient, cfg.Airtable.LocationsTableName)
 	locationHandler := location.NewHandler(locationRepo)
 
+	productGroupRepo := productGroup.NewAirtableRepository(airtableClient, cfg.Airtable.ProductGroupsTableName)
+	productGroupHandler := productGroup.NewHandler(productGroupRepo)
+
 	userRepo := user.NewAirtableRepository(airtableClient, cfg.Airtable.UsersTableName)
 
 	// Create user handler with JWT configuration
@@ -112,7 +116,7 @@ func main() {
 		}
 	}
 
-	router := server.NewRouter(locationHandler, userHandler, emailHandler, cfg.Auth.JWTSecret)
+	router := server.NewRouter(locationHandler, productGroupHandler, userHandler, emailHandler, cfg.Auth.JWTSecret)
 
 	// Use server address from config
 	serverAddr := cfg.ServerAddress()

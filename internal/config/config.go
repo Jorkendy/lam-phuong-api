@@ -29,10 +29,11 @@ type ServerConfig struct {
 
 // AirtableConfig holds Airtable-related configuration
 type AirtableConfig struct {
-	APIKey             string `mapstructure:"api_key"`
-	BaseID             string `mapstructure:"base_id"`
-	LocationsTableName string `mapstructure:"locations_table_name"`
-	UsersTableName     string `mapstructure:"users_table_name"`
+	APIKey                 string `mapstructure:"api_key"`
+	BaseID                 string `mapstructure:"base_id"`
+	LocationsTableName     string `mapstructure:"locations_table_name"`
+	UsersTableName         string `mapstructure:"users_table_name"`
+	ProductGroupsTableName string `mapstructure:"product_groups_table_name"`
 }
 
 // AuthConfig holds authentication-related configuration
@@ -107,6 +108,7 @@ func setDefaults() {
 	viper.SetDefault("airtable.base_id", "")
 	viper.SetDefault("airtable.locations_table_name", "Địa điểm")
 	viper.SetDefault("airtable.users_table_name", "Người dùng")
+	viper.SetDefault("airtable.product_groups_table_name", "Nhóm sản phẩm")
 
 	// Auth defaults
 	viper.SetDefault("auth.jwt_secret", "")
@@ -143,6 +145,11 @@ func (c *Config) Validate() error {
 	// UsersTableName has a default value, so it's optional but we ensure it's set
 	if c.Airtable.UsersTableName == "" {
 		c.Airtable.UsersTableName = "Người dùng" // Fallback to default if somehow empty
+	}
+
+	// ProductGroupsTableName has a default value, so it's optional but we ensure it's set
+	if c.Airtable.ProductGroupsTableName == "" {
+		c.Airtable.ProductGroupsTableName = "Nhóm sản phẩm" // Fallback to default if somehow empty
 	}
 
 	// Validate auth config

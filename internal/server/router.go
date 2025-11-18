@@ -10,12 +10,13 @@ import (
 
 	"lam-phuong-api/internal/email"
 	"lam-phuong-api/internal/location"
+	productGroup "lam-phuong-api/internal/productGroup"
 	"lam-phuong-api/internal/response"
 	"lam-phuong-api/internal/user"
 )
 
 // NewRouter constructs a Gin engine configured with middleware and routes.
-func NewRouter(locationHandler *location.Handler, userHandler *user.Handler, emailHandler *email.Handler, jwtSecret string) *gin.Engine {
+func NewRouter(locationHandler *location.Handler, productGroupHandler *productGroup.Handler, userHandler *user.Handler, emailHandler *email.Handler, jwtSecret string) *gin.Engine {
 	router := gin.Default()
 
 	// Configure CORS middleware
@@ -79,6 +80,9 @@ func NewRouter(locationHandler *location.Handler, userHandler *user.Handler, ema
 
 			// Location routes (authenticated users)
 			locationHandler.RegisterRoutes(protected)
+
+			// Product group routes (authenticated users)
+			productGroupHandler.RegisterRoutes(protected)
 		}
 	}
 

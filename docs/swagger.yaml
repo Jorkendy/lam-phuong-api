@@ -53,6 +53,52 @@ definitions:
     required:
     - name
     type: object
+  productgroup.ProductGroup:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+    type: object
+  productgroup.ProductGroupResponseWrapper:
+    description: Response containing a single product group
+    properties:
+      data:
+        $ref: '#/definitions/productgroup.ProductGroup'
+      message:
+        example: Product group retrieved successfully
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  productgroup.ProductGroupsResponseWrapper:
+    description: Response containing a list of product groups
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/productgroup.ProductGroup'
+        type: array
+      message:
+        example: Product groups retrieved successfully
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  productgroup.productGroupPayload:
+    properties:
+      name:
+        description: Required
+        type: string
+      slug:
+        description: Optional, will be generated from name if not provided
+        type: string
+    required:
+    - name
+    type: object
   response.ErrorInfo:
     description: Error information structure
     properties:
@@ -500,6 +546,98 @@ paths:
       summary: Delete a location by slug
       tags:
       - locations
+  /product-groups:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all product groups (requires authentication)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product groups retrieved successfully
+          schema:
+            $ref: '#/definitions/productgroup.ProductGroupsResponseWrapper'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all product groups
+      tags:
+      - product-groups
+    post:
+      consumes:
+      - application/json
+      description: Create a new product group with name and optional slug. If slug
+        is not provided, it will be generated from the name. (requires authentication)
+      parameters:
+      - description: Product group payload
+        in: body
+        name: productGroup
+        required: true
+        schema:
+          $ref: '#/definitions/productgroup.productGroupPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Product group created successfully
+          schema:
+            $ref: '#/definitions/productgroup.ProductGroupResponseWrapper'
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new product group
+      tags:
+      - product-groups
+  /product-groups/{slug}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a product group using its slug (requires authentication)
+      parameters:
+      - description: Product group slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product group deleted successfully
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Product group not found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a product group by slug
+      tags:
+      - product-groups
   /users:
     get:
       consumes:
