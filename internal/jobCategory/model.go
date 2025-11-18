@@ -4,10 +4,10 @@ import "fmt"
 
 // Airtable field names
 const (
-	FieldName      = "Name"
-	FieldSlug      = "Slug"
-	FieldCreatedAt = "Created At"
-	FieldUpdatedAt = "Updated At"
+	FieldName      = "fld5lRrtQbmRdN8LU"
+	FieldSlug      = "fld4v0mxGkBFokYBD"
+	FieldCreatedAt = "fldPDk0zGiCMpvJBt"
+	FieldUpdatedAt = "fldMIK8hjU2aa80oM"
 )
 
 // Helper functions
@@ -72,4 +72,3 @@ func FromAirtable(record map[string]interface{}) (*JobCategory, error) {
 		Slug: getStringField(fields, FieldSlug),
 	}, nil
 }
-
